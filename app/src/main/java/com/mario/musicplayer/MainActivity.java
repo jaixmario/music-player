@@ -1,3 +1,4 @@
+// MainActivity.java
 package com.mario.musicplayer;
 
 import android.Manifest;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 public class MainActivity extends AppCompatActivity {
 
     private ListView listView;
+    private Button playButton, pauseButton, stopButton;
     private ArrayList<File> songList;
     private int currentSongIndex = -1;
     private final int REQUEST_PERMISSION = 1001;
@@ -25,7 +27,15 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
         listView = findViewById(R.id.listView);
+        playButton = findViewById(R.id.playButton);
+        pauseButton = findViewById(R.id.pauseButton);
+        stopButton = findViewById(R.id.stopButton);
+
+        playButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_RESUME));
+        pauseButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_PAUSE));
+        stopButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_STOP));
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -34,6 +44,12 @@ public class MainActivity extends AppCompatActivity {
         } else {
             loadSongs();
         }
+    }
+
+    private void sendActionToService(String action) {
+        Intent intent = new Intent(this, MusicService.class);
+        intent.setAction(action);
+        startService(intent);
     }
 
     @Override
