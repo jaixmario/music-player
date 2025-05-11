@@ -64,7 +64,7 @@ public class MainActivity extends AppCompatActivity {
 
             Intent intent = new Intent(MainActivity.this, MusicService.class);
             intent.setAction(MusicService.ACTION_START);
-            intent.putExtra("path", selectedSong.getAbsolutePath());
+            intent.putExtra("song_path", selectedSong.getAbsolutePath());
             startService(intent);
         });
     }
