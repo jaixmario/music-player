@@ -5,9 +5,8 @@ import android.content.pm.PackageManager;
 import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Environment;
-import android.widget.ArrayAdapter;
-import android.widget.ListView;
-import android.widget.Toast;
+import android.view.View;
+import android.widget.*;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -19,15 +18,25 @@ import java.util.ArrayList;
 public class MainActivity extends AppCompatActivity {
 
     private ListView listView;
+    private Button playButton, pauseButton, stopButton;
     private ArrayList<File> songList;
     private MediaPlayer mediaPlayer;
+    private int currentSongIndex = -1;
     private final int REQUEST_PERMISSION = 1001;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        listView = new ListView(this);
-        setContentView(listView);
+        setContentView(R.layout.activity_main); // Make sure you have activity_main.xml
+
+        listView = findViewById(R.id.listView);
+        playButton = findViewById(R.id.playButton);
+        pauseButton = findViewById(R.id.pauseButton);
+        stopButton = findViewById(R.id.stopButton);
+
+        playButton.setOnClickListener(v -> playSong());
+        pauseButton.setOnClickListener(v -> pauseSong());
+        stopButton.setOnClickListener(v -> stopSong());
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -61,11 +70,40 @@ public class MainActivity extends AppCompatActivity {
         listView.setAdapter(adapter);
 
         listView.setOnItemClickListener((parent, view, position, id) -> {
-            if (mediaPlayer != null) mediaPlayer.release();
-            mediaPlayer = MediaPlayer.create(this, android.net.Uri.fromFile(songList.get(position)));
-            mediaPlayer.start();
-            Toast.makeText(this, "Playing: " + songList.get(position).getName(), Toast.LENGTH_SHORT).show();
+            currentSongIndex = position;
+            playSelectedSong();
         });
+    }
+
+    private void playSelectedSong() {
+        if (mediaPlayer != null) mediaPlayer.release();
+        File selectedSong = songList.get(currentSongIndex);
+        mediaPlayer = MediaPlayer.create(this, android.net.Uri.fromFile(selectedSong));
+        mediaPlayer.start();
+        Toast.makeText(this, "Playing: " + selectedSong.getName(), Toast.LENGTH_SHORT).show();
+    }
+
+    private void playSong() {
+        if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
+            mediaPlayer.start();
+            Toast.makeText(this, "Resumed", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void pauseSong() {
+        if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+            mediaPlayer.pause();
+            Toast.makeText(this, "Paused", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void stopSong() {
+        if (mediaPlayer != null) {
+            mediaPlayer.stop();
+            mediaPlayer.release();
+            mediaPlayer = null;
+            Toast.makeText(this, "Stopped", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private ArrayList<File> findSongs(File dir) {
@@ -75,7 +113,7 @@ public class MainActivity extends AppCompatActivity {
             for (File file : files) {
                 if (file.isDirectory()) {
                     songs.addAll(findSongs(file));
-                } else if (file.getName().endsWith(".mp3")) {
+                } else if (file.getName().endsWith(".mp3") || file.getName().endsWith(".m4a")) {
                     songs.add(file);
                 }
             }
