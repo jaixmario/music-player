@@ -9,7 +9,6 @@ import android.graphics.BitmapFactory;
 import android.media.MediaMetadataRetriever;
 import android.os.Bundle;
 import android.os.Environment;
-import android.view.View;
 import android.widget.*;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -100,20 +99,29 @@ public class MainActivity extends AppCompatActivity {
 
     private void extractMetadata(String path) {
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
-        retriever.setDataSource(path);
+        try {
+            retriever.setDataSource(path);
 
-        String title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
-        String artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
-        byte[] art = retriever.getEmbeddedPicture();
+            String title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
+            String artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
+            byte[] art = retriever.getEmbeddedPicture();
 
-        titleText.setText(title != null ? title : "Unknown Title");
-        artistText.setText(artist != null ? artist : "Unknown Artist");
+            titleText.setText(title != null ? title : "Unknown Title");
+            artistText.setText(artist != null ? artist : "Unknown Artist");
 
-        if (art != null) {
-            Bitmap bitmap = BitmapFactory.decodeByteArray(art, 0, art.length);
-            albumArt.setImageBitmap(bitmap);
-        } else {
-            albumArt.setImageResource(R.drawable.ic_music_note); // fallback icon
+            if (art != null) {
+                Bitmap bitmap = BitmapFactory.decodeByteArray(art, 0, art.length);
+                albumArt.setImageBitmap(bitmap);
+            } else {
+                albumArt.setImageResource(R.drawable.ic_music_note);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            titleText.setText("Unknown Title");
+            artistText.setText("Unknown Artist");
+            albumArt.setImageResource(R.drawable.ic_music_note);
+        } finally {
+            retriever.release();
         }
     }
 
