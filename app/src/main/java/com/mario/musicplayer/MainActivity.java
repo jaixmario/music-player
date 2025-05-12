@@ -9,6 +9,8 @@ import android.graphics.BitmapFactory;
 import android.media.MediaMetadataRetriever;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.view.View;
 import android.widget.*;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -25,10 +27,12 @@ public class MainActivity extends AppCompatActivity {
     private ListView listView;
     private Button playButton, pauseButton, stopButton;
     private ShapeableImageView albumArt;
-    private TextView titleText, artistText;
+    private TextView titleText, artistText, currentTimeText, durationText;
+    private SeekBar seekBar;
     private ArrayList<File> songList;
     private int currentSongIndex = -1;
     private final int REQUEST_PERMISSION = 1001;
+    private Handler handler = new Handler();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,6 +46,9 @@ public class MainActivity extends AppCompatActivity {
         albumArt = findViewById(R.id.albumArt);
         titleText = findViewById(R.id.titleText);
         artistText = findViewById(R.id.artistText);
+        currentTimeText = findViewById(R.id.currentTime);
+        durationText = findViewById(R.id.totalTime);
+        seekBar = findViewById(R.id.seekBar);
 
         playButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_RESUME));
         pauseButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_PAUSE));
@@ -99,30 +106,34 @@ public class MainActivity extends AppCompatActivity {
 
     private void extractMetadata(String path) {
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
-        try {
-            retriever.setDataSource(path);
+        retriever.setDataSource(path);
 
-            String title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
-            String artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
-            byte[] art = retriever.getEmbeddedPicture();
+        String title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
+        String artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
+        String durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+        byte[] art = retriever.getEmbeddedPicture();
 
-            titleText.setText(title != null ? title : "Unknown Title");
-            artistText.setText(artist != null ? artist : "Unknown Artist");
+        titleText.setText(title != null ? title : "Unknown Title");
+        artistText.setText(artist != null ? artist : "Unknown Artist");
 
-            if (art != null) {
-                Bitmap bitmap = BitmapFactory.decodeByteArray(art, 0, art.length);
-                albumArt.setImageBitmap(bitmap);
-            } else {
-                albumArt.setImageResource(R.drawable.ic_music_note);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            titleText.setText("Unknown Title");
-            artistText.setText("Unknown Artist");
-            albumArt.setImageResource(R.drawable.ic_music_note);
-        } finally {
-            retriever.release();
+        if (durationStr != null) {
+            int durationMs = Integer.parseInt(durationStr);
+            seekBar.setMax(durationMs);
+            durationText.setText(millisecondsToTimer(durationMs));
         }
+
+        if (art != null) {
+            Bitmap bitmap = BitmapFactory.decodeByteArray(art, 0, art.length);
+            albumArt.setImageBitmap(bitmap);
+        } else {
+            albumArt.setImageResource(R.drawable.ic_music_note);
+        }
+    }
+
+    private String millisecondsToTimer(int milliseconds) {
+        int minutes = (milliseconds / 1000) / 60;
+        int seconds = (milliseconds / 1000) % 60;
+        return String.format("%d:%02d", minutes, seconds);
     }
 
     private ArrayList<File> findSongs(File dir) {
