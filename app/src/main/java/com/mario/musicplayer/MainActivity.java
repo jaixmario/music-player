@@ -30,7 +30,6 @@ public class MainActivity extends AppCompatActivity {
     private Handler handler = new Handler();
     private Animation rotateAnim;
     private SharedPreferences prefs;
-    private boolean isPlaying = false;
 
     private final BroadcastReceiver updateReceiver = new BroadcastReceiver() {
         @Override
@@ -41,17 +40,14 @@ public class MainActivity extends AppCompatActivity {
             if ("paused".equals(status)) {
                 playPauseButton.setImageResource(android.R.drawable.ic_media_play);
                 albumArt.clearAnimation();
-                isPlaying = false;
             } else if ("resumed".equals(status) || "started".equals(status)) {
                 playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
                 albumArt.startAnimation(rotateAnim);
-                isPlaying = true;
                 startSeekBarUpdate();
             } else if ("next".equals(status) && path != null) {
                 extractMetadata(path);
                 playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
                 albumArt.startAnimation(rotateAnim);
-                isPlaying = true;
                 startSeekBarUpdate();
             }
         }
@@ -102,14 +98,21 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onResume() {
-    super.onResume();
-    registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
+        super.onResume();
+        registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
 
-    // Check latest playing song index and update UI
-    int index = prefs.getInt("last_index", -1);
-    if (index != -1 && songList != null && index < songList.size()) {
-        currentSongIndex = index;
-        extractMetadata(songList.get(index).getAbsolutePath());
+        String currentPath = MusicService.getCurrentPath();
+        if (currentPath != null) {
+            extractMetadata(currentPath);
+            playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
+            albumArt.startAnimation(rotateAnim);
+            startSeekBarUpdate();
+        } else {
+            int index = prefs.getInt("last_index", -1);
+            if (index != -1 && songList != null && index < songList.size()) {
+                currentSongIndex = index;
+                extractMetadata(songList.get(index).getAbsolutePath());
+            }
         }
     }
 
@@ -169,7 +172,6 @@ public class MainActivity extends AppCompatActivity {
 
         playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
         albumArt.startAnimation(rotateAnim);
-        isPlaying = true;
         startSeekBarUpdate();
     }
 
