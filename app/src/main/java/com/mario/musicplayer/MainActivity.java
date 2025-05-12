@@ -1,4 +1,3 @@
-// MainActivity.java
 package com.mario.musicplayer;
 
 import android.Manifest;
@@ -7,10 +6,10 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.MediaMetadataRetriever;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
-import android.view.View;
 import android.widget.*;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -54,6 +53,19 @@ public class MainActivity extends AppCompatActivity {
         playButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_RESUME));
         pauseButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_PAUSE));
         stopButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_STOP));
+
+        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    MediaPlayer player = MusicService.getMediaPlayer();
+                    if (player != null) player.seekTo(progress);
+                }
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -102,7 +114,24 @@ public class MainActivity extends AppCompatActivity {
             intent.setAction(MusicService.ACTION_START);
             intent.putExtra("song_path", selectedSong.getAbsolutePath());
             startService(intent);
+
+            startSeekBarUpdate();
         });
+    }
+
+    private void startSeekBarUpdate() {
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                MediaPlayer player = MusicService.getMediaPlayer();
+                if (player != null && player.isPlaying()) {
+                    int currentPos = player.getCurrentPosition();
+                    seekBar.setProgress(currentPos);
+                    currentTimeText.setText(millisecondsToTimer(currentPos));
+                }
+                handler.postDelayed(this, 500);
+            }
+        }, 0);
     }
 
     private void extractMetadata(String path) {
