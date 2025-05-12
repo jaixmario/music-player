@@ -10,6 +10,8 @@ import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.*;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -33,6 +35,7 @@ public class MainActivity extends AppCompatActivity {
     private int currentSongIndex = -1;
     private final int REQUEST_PERMISSION = 1001;
     private Handler handler = new Handler();
+    private Animation rotateAnim;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,10 +52,14 @@ public class MainActivity extends AppCompatActivity {
         currentTimeText = findViewById(R.id.currentTime);
         durationText = findViewById(R.id.totalTime);
         seekBar = findViewById(R.id.seekBar);
+        rotateAnim = AnimationUtils.loadAnimation(this, R.anim.rotate_album);
 
         playButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_RESUME));
         pauseButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_PAUSE));
-        stopButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_STOP));
+        stopButton.setOnClickListener(v -> {
+            sendActionToService(MusicService.ACTION_STOP);
+            albumArt.clearAnimation();  // stop spinning
+        });
 
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
@@ -62,7 +69,6 @@ public class MainActivity extends AppCompatActivity {
                     if (player != null) player.seekTo(progress);
                 }
             }
-
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
@@ -115,6 +121,7 @@ public class MainActivity extends AppCompatActivity {
             intent.putExtra("song_path", selectedSong.getAbsolutePath());
             startService(intent);
 
+            albumArt.startAnimation(rotateAnim); // start spinning
             startSeekBarUpdate();
         });
     }
