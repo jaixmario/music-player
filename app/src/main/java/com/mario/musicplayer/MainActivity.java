@@ -4,13 +4,19 @@ package com.mario.musicplayer;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.media.MediaMetadataRetriever;
 import android.os.Bundle;
 import android.os.Environment;
+import android.view.View;
 import android.widget.*;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
+import com.google.android.material.imageview.ShapeableImageView;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -19,6 +25,8 @@ public class MainActivity extends AppCompatActivity {
 
     private ListView listView;
     private Button playButton, pauseButton, stopButton;
+    private ShapeableImageView albumArt;
+    private TextView titleText, artistText;
     private ArrayList<File> songList;
     private int currentSongIndex = -1;
     private final int REQUEST_PERMISSION = 1001;
@@ -32,6 +40,9 @@ public class MainActivity extends AppCompatActivity {
         playButton = findViewById(R.id.playButton);
         pauseButton = findViewById(R.id.pauseButton);
         stopButton = findViewById(R.id.stopButton);
+        albumArt = findViewById(R.id.albumArt);
+        titleText = findViewById(R.id.titleText);
+        artistText = findViewById(R.id.artistText);
 
         playButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_RESUME));
         pauseButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_PAUSE));
@@ -78,11 +89,32 @@ public class MainActivity extends AppCompatActivity {
             currentSongIndex = position;
             File selectedSong = songList.get(currentSongIndex);
 
+            extractMetadata(selectedSong.getAbsolutePath());
+
             Intent intent = new Intent(MainActivity.this, MusicService.class);
             intent.setAction(MusicService.ACTION_START);
             intent.putExtra("song_path", selectedSong.getAbsolutePath());
             startService(intent);
         });
+    }
+
+    private void extractMetadata(String path) {
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        retriever.setDataSource(path);
+
+        String title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
+        String artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
+        byte[] art = retriever.getEmbeddedPicture();
+
+        titleText.setText(title != null ? title : "Unknown Title");
+        artistText.setText(artist != null ? artist : "Unknown Artist");
+
+        if (art != null) {
+            Bitmap bitmap = BitmapFactory.decodeByteArray(art, 0, art.length);
+            albumArt.setImageBitmap(bitmap);
+        } else {
+            albumArt.setImageResource(R.drawable.ic_music_note); // fallback icon
+        }
     }
 
     private ArrayList<File> findSongs(File dir) {
