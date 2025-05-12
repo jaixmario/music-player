@@ -1,7 +1,9 @@
+
 package com.mario.musicplayer;
 
 import android.Manifest;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -37,11 +39,13 @@ public class MainActivity extends AppCompatActivity {
     private Handler handler = new Handler();
     private Animation rotateAnim;
     private boolean isPlaying = false;
+    private SharedPreferences prefs;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        prefs = getSharedPreferences("music_player_prefs", MODE_PRIVATE);
 
         listView = findViewById(R.id.listView);
         playPauseButton = findViewById(R.id.playPauseButton);
@@ -55,35 +59,19 @@ public class MainActivity extends AppCompatActivity {
         seekBar = findViewById(R.id.seekBar);
         rotateAnim = AnimationUtils.loadAnimation(this, R.anim.rotate_album);
 
-        playPauseButton.setOnClickListener(v -> {
-            MediaPlayer player = MusicService.getMediaPlayer();
-            if (player != null) {
-                if (player.isPlaying()) {
-                    sendActionToService(MusicService.ACTION_PAUSE);
-                    playPauseButton.setImageResource(android.R.drawable.ic_media_play);
-                    albumArt.clearAnimation();
-                    isPlaying = false;
-                } else {
-                    sendActionToService(MusicService.ACTION_RESUME);
-                    playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
-                    albumArt.startAnimation(rotateAnim);
-                    isPlaying = true;
-                }
-            }
-        });
-
+        playPauseButton.setOnClickListener(v -> togglePlayPause());
         nextButton.setOnClickListener(v -> playNext());
         prevButton.setOnClickListener(v -> playPrevious());
 
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (fromUser) {
                     MediaPlayer player = MusicService.getMediaPlayer();
                     if (player != null) player.seekTo(progress);
                 }
             }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+            public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
@@ -92,6 +80,23 @@ public class MainActivity extends AppCompatActivity {
                     new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_PERMISSION);
         } else {
             loadSongs();
+        }
+    }
+
+    private void togglePlayPause() {
+        MediaPlayer player = MusicService.getMediaPlayer();
+        if (player != null) {
+            if (player.isPlaying()) {
+                sendActionToService(MusicService.ACTION_PAUSE);
+                playPauseButton.setImageResource(android.R.drawable.ic_media_play);
+                albumArt.clearAnimation();
+                isPlaying = false;
+            } else {
+                sendActionToService(MusicService.ACTION_RESUME);
+                playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
+                albumArt.startAnimation(rotateAnim);
+                isPlaying = true;
+            }
         }
     }
 
@@ -110,6 +115,16 @@ public class MainActivity extends AppCompatActivity {
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, songNames);
         listView.setAdapter(adapter);
 
+        int savedIndex = prefs.getInt("last_index", -1);
+        if (savedIndex >= 0 && savedIndex < songList.size()) {
+            currentSongIndex = savedIndex;
+            extractMetadata(songList.get(currentSongIndex).getAbsolutePath());
+            playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
+            albumArt.startAnimation(rotateAnim);
+            isPlaying = true;
+            startSeekBarUpdate();
+        }
+
         listView.setOnItemClickListener((parent, view, position, id) -> {
             currentSongIndex = position;
             playCurrentSong();
@@ -119,8 +134,9 @@ public class MainActivity extends AppCompatActivity {
     private void playCurrentSong() {
         if (currentSongIndex < 0 || currentSongIndex >= songList.size()) return;
         File selectedSong = songList.get(currentSongIndex);
-
         extractMetadata(selectedSong.getAbsolutePath());
+
+        prefs.edit().putInt("last_index", currentSongIndex).apply();
 
         Intent intent = new Intent(this, MusicService.class);
         intent.setAction(MusicService.ACTION_START);
@@ -149,7 +165,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void startSeekBarUpdate() {
         handler.postDelayed(new Runnable() {
-            @Override
             public void run() {
                 MediaPlayer player = MusicService.getMediaPlayer();
                 if (player != null && player.isPlaying()) {
@@ -186,7 +201,6 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 albumArt.setImageResource(android.R.drawable.ic_media_play);
             }
-
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -209,23 +223,11 @@ public class MainActivity extends AppCompatActivity {
         File[] files = dir.listFiles();
         if (files != null) {
             for (File file : files) {
-                if (file.isDirectory()) {
-                    songs.addAll(findSongs(file));
-                } else if (file.getName().endsWith(".mp3") || file.getName().endsWith(".m4a")) {
+                if (file.isDirectory()) songs.addAll(findSongs(file));
+                else if (file.getName().endsWith(".mp3") || file.getName().endsWith(".m4a"))
                     songs.add(file);
-                }
             }
         }
         return songs;
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        if (requestCode == REQUEST_PERMISSION && grantResults.length > 0 &&
-                grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            loadSongs();
-        } else {
-            Toast.makeText(this, "Permission denied", Toast.LENGTH_SHORT).show();
-        }
     }
 }

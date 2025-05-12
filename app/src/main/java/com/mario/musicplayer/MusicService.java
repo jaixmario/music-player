@@ -9,11 +9,14 @@ import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.IBinder;
+import android.content.SharedPreferences;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.io.File;
 
 public class MusicService extends Service {
 
@@ -24,8 +27,13 @@ public class MusicService extends Service {
 
     private MediaPlayer mediaPlayer;
     private static MusicService instance;
+
     private String currentTitle = "Music Playing";
     private String currentArtist = "Enjoy your music";
+
+    private SharedPreferences prefs;
+    private ArrayList<File> songList = new ArrayList<>();
+    private int currentIndex = -1;
 
     public static MediaPlayer getMediaPlayer() {
         return instance != null ? instance.mediaPlayer : null;
@@ -35,6 +43,7 @@ public class MusicService extends Service {
     public void onCreate() {
         super.onCreate();
         instance = this;
+        prefs = getSharedPreferences("music_player_prefs", MODE_PRIVATE);
     }
 
     @Override
@@ -43,6 +52,7 @@ public class MusicService extends Service {
 
         if (ACTION_START.equals(action)) {
             String path = intent.getStringExtra("song_path");
+            currentIndex = prefs.getInt("last_index", -1);
             extractMetadata(path);
             startMediaPlayer(path);
         } else if (ACTION_PAUSE.equals(action)) {
@@ -53,7 +63,7 @@ public class MusicService extends Service {
         } else if (ACTION_RESUME.equals(action)) {
             if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
                 mediaPlayer.start();
-                startForeground(1, createNotification()); // restore notification
+                startForeground(1, createNotification());
             }
         } else if (ACTION_STOP.equals(action)) {
             stopForeground(true);
@@ -61,6 +71,38 @@ public class MusicService extends Service {
         }
 
         return START_STICKY;
+    }
+
+    private void startMediaPlayer(String path) {
+        if (mediaPlayer != null) {
+            mediaPlayer.reset();
+        } else {
+            mediaPlayer = new MediaPlayer();
+        }
+
+        try {
+            mediaPlayer.setDataSource(path);
+            mediaPlayer.prepare();
+            mediaPlayer.start();
+
+            startForeground(1, createNotification());
+
+            mediaPlayer.setOnCompletionListener(mp -> {
+                loadSongs();
+                int nextIndex = prefs.getInt("last_index", -1) + 1;
+                if (nextIndex < songList.size()) {
+                    prefs.edit().putInt("last_index", nextIndex).apply();
+                    String nextPath = songList.get(nextIndex).getAbsolutePath();
+                    extractMetadata(nextPath);
+                    startMediaPlayer(nextPath);
+                } else {
+                    stopForeground(true);
+                }
+            });
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void extractMetadata(String path) {
@@ -77,24 +119,6 @@ public class MusicService extends Service {
         } catch (Exception e) {
             currentTitle = "Unknown Song";
             currentArtist = "Unknown Artist";
-        }
-    }
-
-    private void startMediaPlayer(String path) {
-        if (mediaPlayer != null) {
-            mediaPlayer.reset();
-        } else {
-            mediaPlayer = new MediaPlayer();
-        }
-
-        try {
-            mediaPlayer.setDataSource(path);
-            mediaPlayer.prepare();
-            mediaPlayer.start();
-
-            startForeground(1, createNotification());
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
@@ -119,6 +143,24 @@ public class MusicService extends Service {
                 .setSmallIcon(R.drawable.ic_music_note)
                 .setOngoing(true)
                 .build();
+    }
+
+    private void loadSongs() {
+        File musicDir = new File(android.os.Environment.getExternalStorageDirectory(), "Music");
+        songList.clear();
+        findSongs(musicDir);
+    }
+
+    private void findSongs(File dir) {
+        File[] files = dir.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isDirectory()) findSongs(file);
+                else if (file.getName().endsWith(".mp3") || file.getName().endsWith(".m4a")) {
+                    songList.add(file);
+                }
+            }
+        }
     }
 
     @Override
