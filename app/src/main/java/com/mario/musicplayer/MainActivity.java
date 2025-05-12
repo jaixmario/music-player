@@ -20,6 +20,7 @@ import androidx.core.content.ContextCompat;
 import com.google.android.material.imageview.ShapeableImageView;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
@@ -106,27 +107,37 @@ public class MainActivity extends AppCompatActivity {
 
     private void extractMetadata(String path) {
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
-        retriever.setDataSource(path);
+        try {
+            retriever.setDataSource(path);
 
-        String title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
-        String artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
-        String durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
-        byte[] art = retriever.getEmbeddedPicture();
+            String title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
+            String artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
+            String durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+            byte[] art = retriever.getEmbeddedPicture();
 
-        titleText.setText(title != null ? title : "Unknown Title");
-        artistText.setText(artist != null ? artist : "Unknown Artist");
+            titleText.setText(title != null ? title : "Unknown Title");
+            artistText.setText(artist != null ? artist : "Unknown Artist");
 
-        if (durationStr != null) {
-            int durationMs = Integer.parseInt(durationStr);
-            seekBar.setMax(durationMs);
-            durationText.setText(millisecondsToTimer(durationMs));
-        }
+            if (durationStr != null) {
+                int durationMs = Integer.parseInt(durationStr);
+                seekBar.setMax(durationMs);
+                durationText.setText(millisecondsToTimer(durationMs));
+            }
 
-        if (art != null) {
-            Bitmap bitmap = BitmapFactory.decodeByteArray(art, 0, art.length);
-            albumArt.setImageBitmap(bitmap);
-        } else {
-            albumArt.setImageResource(R.drawable.ic_music_note);
+            if (art != null) {
+                Bitmap bitmap = BitmapFactory.decodeByteArray(art, 0, art.length);
+                albumArt.setImageBitmap(bitmap);
+            } else {
+                albumArt.setImageResource(R.drawable.ic_music_note);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                retriever.release();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
