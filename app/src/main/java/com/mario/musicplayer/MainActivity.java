@@ -102,8 +102,15 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onResume() {
-        super.onResume();
-        registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
+    super.onResume();
+    registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
+
+    // Check latest playing song index and update UI
+    int index = prefs.getInt("last_index", -1);
+    if (index != -1 && songList != null && index < songList.size()) {
+        currentSongIndex = index;
+        extractMetadata(songList.get(index).getAbsolutePath());
+        }
     }
 
     @Override
