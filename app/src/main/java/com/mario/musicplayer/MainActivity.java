@@ -2,24 +2,20 @@ package com.mario.musicplayer;
 
 import android.Manifest;
 import android.content.*;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.media.MediaMetadataRetriever;
-import android.media.MediaPlayer;
+import android.graphics.*;
+import android.media.*;
 import android.os.*;
-import android.view.animation.Animation;
-import android.view.animation.AnimationUtils;
+import android.view.animation.*;
 import android.widget.*;
-import android.content.pm.PackageManager;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.material.imageview.ShapeableImageView;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
+import java.io.*;
+import java.util.*;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -33,15 +29,25 @@ public class MainActivity extends AppCompatActivity {
     private final int REQUEST_PERMISSION = 1001;
     private Handler handler = new Handler();
     private Animation rotateAnim;
-    private boolean isPlaying = false;
     private SharedPreferences prefs;
+    private boolean isPlaying = false;
 
     private final BroadcastReceiver updateReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if ("UPDATE_UI".equals(intent.getAction())) {
-                String path = intent.getStringExtra("song_path");
-                currentSongIndex = prefs.getInt("last_index", -1);
+            String status = intent.getStringExtra("status");
+            String path = intent.getStringExtra("song_path");
+
+            if ("paused".equals(status)) {
+                playPauseButton.setImageResource(android.R.drawable.ic_media_play);
+                albumArt.clearAnimation();
+                isPlaying = false;
+            } else if ("resumed".equals(status) || "started".equals(status)) {
+                playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
+                albumArt.startAnimation(rotateAnim);
+                isPlaying = true;
+                startSeekBarUpdate();
+            } else if ("next".equals(status) && path != null) {
                 extractMetadata(path);
                 playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
                 albumArt.startAnimation(rotateAnim);
@@ -55,8 +61,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        prefs = getSharedPreferences("music_player_prefs", MODE_PRIVATE);
 
+        prefs = getSharedPreferences("music_player_prefs", MODE_PRIVATE);
         listView = findViewById(R.id.listView);
         playPauseButton = findViewById(R.id.playPauseButton);
         nextButton = findViewById(R.id.nextButton);
@@ -74,14 +80,15 @@ public class MainActivity extends AppCompatActivity {
         prevButton.setOnClickListener(v -> playPrevious());
 
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
                 if (fromUser) {
                     MediaPlayer player = MusicService.getMediaPlayer();
                     if (player != null) player.seekTo(progress);
                 }
             }
-            public void onStartTrackingTouch(SeekBar seekBar) {}
-            public void onStopTrackingTouch(SeekBar seekBar) {}
+
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {}
         });
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
@@ -110,14 +117,8 @@ public class MainActivity extends AppCompatActivity {
         if (player != null) {
             if (player.isPlaying()) {
                 sendActionToService(MusicService.ACTION_PAUSE);
-                playPauseButton.setImageResource(android.R.drawable.ic_media_play);
-                albumArt.clearAnimation();
-                isPlaying = false;
             } else {
                 sendActionToService(MusicService.ACTION_RESUME);
-                playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
-                albumArt.startAnimation(rotateAnim);
-                isPlaying = true;
             }
         }
     }
@@ -131,38 +132,32 @@ public class MainActivity extends AppCompatActivity {
     private void loadSongs() {
         File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
         songList = findSongs(musicDir);
-        ArrayList<String> songNames = new ArrayList<>();
-        for (File song : songList) songNames.add(song.getName());
+        ArrayList<String> names = new ArrayList<>();
+        for (File f : songList) names.add(f.getName());
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, songNames);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, names);
         listView.setAdapter(adapter);
 
-        int savedIndex = prefs.getInt("last_index", -1);
-        if (savedIndex >= 0 && savedIndex < songList.size()) {
-            currentSongIndex = savedIndex;
+        int lastIndex = prefs.getInt("last_index", -1);
+        if (lastIndex >= 0 && lastIndex < songList.size()) {
+            currentSongIndex = lastIndex;
             extractMetadata(songList.get(currentSongIndex).getAbsolutePath());
-            playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
-            albumArt.startAnimation(rotateAnim);
-            isPlaying = true;
-            startSeekBarUpdate();
         }
 
-        listView.setOnItemClickListener((parent, view, position, id) -> {
-            currentSongIndex = position;
+        listView.setOnItemClickListener((parent, view, pos, id) -> {
+            currentSongIndex = pos;
             playCurrentSong();
         });
     }
 
     private void playCurrentSong() {
-        if (currentSongIndex < 0 || currentSongIndex >= songList.size()) return;
-        File selectedSong = songList.get(currentSongIndex);
-        extractMetadata(selectedSong.getAbsolutePath());
-
+        File song = songList.get(currentSongIndex);
+        extractMetadata(song.getAbsolutePath());
         prefs.edit().putInt("last_index", currentSongIndex).apply();
 
         Intent intent = new Intent(this, MusicService.class);
         intent.setAction(MusicService.ACTION_START);
-        intent.putExtra("song_path", selectedSong.getAbsolutePath());
+        intent.putExtra("song_path", song.getAbsolutePath());
         startService(intent);
 
         playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
@@ -172,17 +167,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void playNext() {
-        if (songList != null && !songList.isEmpty()) {
-            currentSongIndex = (currentSongIndex + 1) % songList.size();
-            playCurrentSong();
-        }
+        if (songList == null || songList.isEmpty()) return;
+        currentSongIndex = (currentSongIndex + 1) % songList.size();
+        playCurrentSong();
     }
 
     private void playPrevious() {
-        if (songList != null && !songList.isEmpty()) {
-            currentSongIndex = (currentSongIndex - 1 + songList.size()) % songList.size();
-            playCurrentSong();
-        }
+        if (songList == null || songList.isEmpty()) return;
+        currentSongIndex = (currentSongIndex - 1 + songList.size()) % songList.size();
+        playCurrentSong();
     }
 
     private void startSeekBarUpdate() {
@@ -205,16 +198,16 @@ public class MainActivity extends AppCompatActivity {
             retriever.setDataSource(path);
             String title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
             String artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
-            String durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+            String duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
             byte[] art = retriever.getEmbeddedPicture();
 
             titleText.setText(title != null ? title : "Unknown Title");
             artistText.setText(artist != null ? artist : "Unknown Artist");
 
-            if (durationStr != null) {
-                int durationMs = Integer.parseInt(durationStr);
-                seekBar.setMax(durationMs);
-                durationText.setText(millisecondsToTimer(durationMs));
+            if (duration != null) {
+                int ms = Integer.parseInt(duration);
+                seekBar.setMax(ms);
+                durationText.setText(millisecondsToTimer(ms));
             }
 
             if (art != null) {
@@ -234,20 +227,19 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private String millisecondsToTimer(int milliseconds) {
-        int minutes = (milliseconds / 1000) / 60;
-        int seconds = (milliseconds / 1000) % 60;
-        return String.format("%d:%02d", minutes, seconds);
+    private String millisecondsToTimer(int ms) {
+        int mins = (ms / 1000) / 60;
+        int secs = (ms / 1000) % 60;
+        return String.format("%d:%02d", mins, secs);
     }
 
     private ArrayList<File> findSongs(File dir) {
         ArrayList<File> songs = new ArrayList<>();
         File[] files = dir.listFiles();
         if (files != null) {
-            for (File file : files) {
-                if (file.isDirectory()) songs.addAll(findSongs(file));
-                else if (file.getName().endsWith(".mp3") || file.getName().endsWith(".m4a"))
-                    songs.add(file);
+            for (File f : files) {
+                if (f.isDirectory()) songs.addAll(findSongs(f));
+                else if (f.getName().endsWith(".mp3") || f.getName().endsWith(".m4a")) songs.add(f);
             }
         }
         return songs;

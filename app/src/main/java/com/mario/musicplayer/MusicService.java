@@ -1,4 +1,3 @@
-
 package com.mario.musicplayer;
 
 import android.app.*;
@@ -47,15 +46,19 @@ public class MusicService extends Service {
             currentIndex = prefs.getInt("last_index", -1);
             extractMetadata(path);
             startMediaPlayer(path);
+
+            sendBroadcastUpdate("started", path);
         } else if (ACTION_PAUSE.equals(action)) {
             if (mediaPlayer != null && mediaPlayer.isPlaying()) {
                 mediaPlayer.pause();
                 stopForeground(true);
+                sendBroadcastUpdate("paused", null);
             }
         } else if (ACTION_RESUME.equals(action)) {
             if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
                 mediaPlayer.start();
                 startForeground(1, createNotification());
+                sendBroadcastUpdate("resumed", null);
             }
         } else if (ACTION_STOP.equals(action)) {
             stopForeground(true);
@@ -86,7 +89,10 @@ public class MusicService extends Service {
                 currentIndex = prefs.getInt("last_index", -1) + 1;
                 if (currentIndex < songList.size()) {
                     prefs.edit().putInt("last_index", currentIndex).apply();
-                    playSongAt(currentIndex);
+                    String nextPath = songList.get(currentIndex).getAbsolutePath();
+                    extractMetadata(nextPath);
+                    startMediaPlayer(nextPath);
+                    sendBroadcastUpdate("next", nextPath);
                 } else {
                     stopForeground(true);
                 }
@@ -103,10 +109,7 @@ public class MusicService extends Service {
         extractMetadata(file.getAbsolutePath());
         prefs.edit().putInt("last_index", index).apply();
         startMediaPlayer(file.getAbsolutePath());
-
-        Intent updateIntent = new Intent("UPDATE_UI");
-        updateIntent.putExtra("song_path", file.getAbsolutePath());
-        sendBroadcast(updateIntent);
+        sendBroadcastUpdate("next", file.getAbsolutePath());
     }
 
     private void extractMetadata(String path) {
@@ -124,6 +127,13 @@ public class MusicService extends Service {
             currentTitle = "Unknown Song";
             currentArtist = "Unknown Artist";
         }
+    }
+
+    private void sendBroadcastUpdate(String status, String path) {
+        Intent intent = new Intent("UPDATE_UI");
+        intent.putExtra("status", status);
+        if (path != null) intent.putExtra("song_path", path);
+        sendBroadcast(intent);
     }
 
     private Notification createNotification() {
