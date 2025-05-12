@@ -1,17 +1,12 @@
-
 package com.mario.musicplayer;
 
 import android.Manifest;
-import android.content.Intent;
-import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
+import android.content.*;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
-import android.os.Bundle;
-import android.os.Environment;
-import android.os.Handler;
+import android.os.*;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.widget.*;
@@ -40,6 +35,21 @@ public class MainActivity extends AppCompatActivity {
     private Animation rotateAnim;
     private boolean isPlaying = false;
     private SharedPreferences prefs;
+
+    private final BroadcastReceiver updateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if ("UPDATE_UI".equals(intent.getAction())) {
+                String path = intent.getStringExtra("song_path");
+                currentSongIndex = prefs.getInt("last_index", -1);
+                extractMetadata(path);
+                playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
+                albumArt.startAnimation(rotateAnim);
+                isPlaying = true;
+                startSeekBarUpdate();
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -81,6 +91,18 @@ public class MainActivity extends AppCompatActivity {
         } else {
             loadSongs();
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        unregisterReceiver(updateReceiver);
     }
 
     private void togglePlayPause() {

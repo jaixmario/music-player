@@ -1,22 +1,14 @@
+
 package com.mario.musicplayer;
 
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.Service;
-import android.content.Intent;
-import android.media.MediaMetadataRetriever;
-import android.media.MediaPlayer;
-import android.os.Build;
-import android.os.IBinder;
-import android.content.SharedPreferences;
-
+import android.app.*;
+import android.content.*;
+import android.media.*;
+import android.os.*;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.io.File;
+import java.io.*;
+import java.util.*;
 
 public class MusicService extends Service {
 
@@ -24,16 +16,16 @@ public class MusicService extends Service {
     public static final String ACTION_PAUSE = "PAUSE";
     public static final String ACTION_RESUME = "RESUME";
     public static final String ACTION_STOP = "STOP";
+    public static final String ACTION_NEXT = "NEXT";
+    public static final String ACTION_PREV = "PREV";
 
     private MediaPlayer mediaPlayer;
     private static MusicService instance;
-
     private String currentTitle = "Music Playing";
     private String currentArtist = "Enjoy your music";
-
-    private SharedPreferences prefs;
     private ArrayList<File> songList = new ArrayList<>();
     private int currentIndex = -1;
+    private SharedPreferences prefs;
 
     public static MediaPlayer getMediaPlayer() {
         return instance != null ? instance.mediaPlayer : null;
@@ -44,12 +36,12 @@ public class MusicService extends Service {
         super.onCreate();
         instance = this;
         prefs = getSharedPreferences("music_player_prefs", MODE_PRIVATE);
+        loadSongs();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent.getAction();
-
         if (ACTION_START.equals(action)) {
             String path = intent.getStringExtra("song_path");
             currentIndex = prefs.getInt("last_index", -1);
@@ -58,7 +50,7 @@ public class MusicService extends Service {
         } else if (ACTION_PAUSE.equals(action)) {
             if (mediaPlayer != null && mediaPlayer.isPlaying()) {
                 mediaPlayer.pause();
-                stopForeground(true); // remove notification
+                stopForeground(true);
             }
         } else if (ACTION_RESUME.equals(action)) {
             if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
@@ -68,17 +60,20 @@ public class MusicService extends Service {
         } else if (ACTION_STOP.equals(action)) {
             stopForeground(true);
             stopSelf();
+        } else if (ACTION_NEXT.equals(action)) {
+            currentIndex = (currentIndex + 1) % songList.size();
+            playSongAt(currentIndex);
+        } else if (ACTION_PREV.equals(action)) {
+            currentIndex = (currentIndex - 1 + songList.size()) % songList.size();
+            playSongAt(currentIndex);
         }
 
         return START_STICKY;
     }
 
     private void startMediaPlayer(String path) {
-        if (mediaPlayer != null) {
-            mediaPlayer.reset();
-        } else {
-            mediaPlayer = new MediaPlayer();
-        }
+        if (mediaPlayer != null) mediaPlayer.reset();
+        else mediaPlayer = new MediaPlayer();
 
         try {
             mediaPlayer.setDataSource(path);
@@ -88,13 +83,10 @@ public class MusicService extends Service {
             startForeground(1, createNotification());
 
             mediaPlayer.setOnCompletionListener(mp -> {
-                loadSongs();
-                int nextIndex = prefs.getInt("last_index", -1) + 1;
-                if (nextIndex < songList.size()) {
-                    prefs.edit().putInt("last_index", nextIndex).apply();
-                    String nextPath = songList.get(nextIndex).getAbsolutePath();
-                    extractMetadata(nextPath);
-                    startMediaPlayer(nextPath);
+                currentIndex = prefs.getInt("last_index", -1) + 1;
+                if (currentIndex < songList.size()) {
+                    prefs.edit().putInt("last_index", currentIndex).apply();
+                    playSongAt(currentIndex);
                 } else {
                     stopForeground(true);
                 }
@@ -103,6 +95,18 @@ public class MusicService extends Service {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private void playSongAt(int index) {
+        if (index < 0 || index >= songList.size()) return;
+        File file = songList.get(index);
+        extractMetadata(file.getAbsolutePath());
+        prefs.edit().putInt("last_index", index).apply();
+        startMediaPlayer(file.getAbsolutePath());
+
+        Intent updateIntent = new Intent("UPDATE_UI");
+        updateIntent.putExtra("song_path", file.getAbsolutePath());
+        sendBroadcast(updateIntent);
     }
 
     private void extractMetadata(String path) {
@@ -124,30 +128,32 @@ public class MusicService extends Service {
 
     private Notification createNotification() {
         String channelId = "music_channel";
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    channelId,
-                    "Music Playback",
-                    NotificationManager.IMPORTANCE_LOW
-            );
+            NotificationChannel channel = new NotificationChannel(channelId, "Music Playback", NotificationManager.IMPORTANCE_LOW);
             NotificationManager manager = getSystemService(NotificationManager.class);
-            if (manager != null) {
-                manager.createNotificationChannel(channel);
-            }
+            if (manager != null) manager.createNotificationChannel(channel);
         }
+
+        PendingIntent prevIntent = PendingIntent.getService(this, 0,
+                new Intent(this, MusicService.class).setAction(ACTION_PREV), PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent pauseIntent = PendingIntent.getService(this, 1,
+                new Intent(this, MusicService.class).setAction(ACTION_PAUSE), PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent nextIntent = PendingIntent.getService(this, 2,
+                new Intent(this, MusicService.class).setAction(ACTION_NEXT), PendingIntent.FLAG_IMMUTABLE);
 
         return new NotificationCompat.Builder(this, channelId)
                 .setContentTitle(currentTitle)
                 .setContentText(currentArtist)
                 .setSmallIcon(R.drawable.ic_music_note)
+                .addAction(android.R.drawable.ic_media_previous, "Prev", prevIntent)
+                .addAction(android.R.drawable.ic_media_pause, "Pause", pauseIntent)
+                .addAction(android.R.drawable.ic_media_next, "Next", nextIntent)
                 .setOngoing(true)
                 .build();
     }
 
     private void loadSongs() {
-        File musicDir = new File(android.os.Environment.getExternalStorageDirectory(), "Music");
-        songList.clear();
+        File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
         findSongs(musicDir);
     }
 
