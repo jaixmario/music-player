@@ -13,7 +13,7 @@
         android:layout_gravity="center"
         android:scaleType="centerCrop"
         app:shapeAppearanceOverlay="@style/RoundedImageView"
-        android:src="@drawable/ic_music_note" />
+        android:src="@android:drawable/ic_media_play" />
 
     <TextView
         android:id="@+id/titleText"
@@ -39,7 +39,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingVertical="4dp">
+        android:paddingVertical="6dp">
 
         <TextView
             android:id="@+id/currentTime"
@@ -47,7 +47,7 @@
             android:layout_height="wrap_content"
             android:text="0:00"
             android:textSize="12sp"
-            android:layout_marginEnd="8dp"/>
+            android:layout_marginEnd="6dp"/>
 
         <SeekBar
             android:id="@+id/seekBar"
@@ -61,36 +61,41 @@
             android:layout_height="wrap_content"
             android:text="0:00"
             android:textSize="12sp"
-            android:layout_marginStart="8dp"/>
+            android:layout_marginStart="6dp"/>
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center"
         android:orientation="horizontal"
-        android:padding="8dp">
+        android:gravity="center"
+        android:layout_marginTop="8dp"
+        android:padding="4dp">
 
-        <Button
-            android:id="@+id/playButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Play" />
+        <ImageButton
+            android:id="@+id/prevButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_media_previous"
+            android:contentDescription="Previous" />
 
-        <Button
-            android:id="@+id/pauseButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Pause" />
+        <ImageButton
+            android:id="@+id/playPauseButton"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_marginHorizontal="16dp"
+            android:background="@android:color/transparent"
+            android:src="@android:drawable/ic_media_play"
+            android:contentDescription="Play/Pause" />
 
-        <Button
-            android:id="@+id/stopButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Stop" />
+        <ImageButton
+            android:id="@+id/nextButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_media_next"
+            android:contentDescription="Next" />
     </LinearLayout>
 
     <ListView
@@ -99,5 +104,4 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:dividerHeight="1dp" />
-
 </LinearLayout>

@@ -27,7 +27,7 @@ import java.util.ArrayList;
 public class MainActivity extends AppCompatActivity {
 
     private ListView listView;
-    private Button playButton, pauseButton, stopButton;
+    private ImageButton playPauseButton, nextButton, prevButton;
     private ShapeableImageView albumArt;
     private TextView titleText, artistText, currentTimeText, durationText;
     private SeekBar seekBar;
@@ -36,6 +36,7 @@ public class MainActivity extends AppCompatActivity {
     private final int REQUEST_PERMISSION = 1001;
     private Handler handler = new Handler();
     private Animation rotateAnim;
+    private boolean isPlaying = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,9 +44,9 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         listView = findViewById(R.id.listView);
-        playButton = findViewById(R.id.playButton);
-        pauseButton = findViewById(R.id.pauseButton);
-        stopButton = findViewById(R.id.stopButton);
+        playPauseButton = findViewById(R.id.playPauseButton);
+        nextButton = findViewById(R.id.nextButton);
+        prevButton = findViewById(R.id.prevButton);
         albumArt = findViewById(R.id.albumArt);
         titleText = findViewById(R.id.titleText);
         artistText = findViewById(R.id.artistText);
@@ -54,16 +55,28 @@ public class MainActivity extends AppCompatActivity {
         seekBar = findViewById(R.id.seekBar);
         rotateAnim = AnimationUtils.loadAnimation(this, R.anim.rotate_album);
 
-        playButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_RESUME));
-        pauseButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_PAUSE));
-        stopButton.setOnClickListener(v -> {
-            sendActionToService(MusicService.ACTION_STOP);
-            albumArt.clearAnimation();  // stop spinning
+        playPauseButton.setOnClickListener(v -> {
+            MediaPlayer player = MusicService.getMediaPlayer();
+            if (player != null) {
+                if (player.isPlaying()) {
+                    sendActionToService(MusicService.ACTION_PAUSE);
+                    playPauseButton.setImageResource(android.R.drawable.ic_media_play);
+                    albumArt.clearAnimation();
+                    isPlaying = false;
+                } else {
+                    sendActionToService(MusicService.ACTION_RESUME);
+                    playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
+                    albumArt.startAnimation(rotateAnim);
+                    isPlaying = true;
+                }
+            }
         });
 
+        nextButton.setOnClickListener(v -> playNext());
+        prevButton.setOnClickListener(v -> playPrevious());
+
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (fromUser) {
                     MediaPlayer player = MusicService.getMediaPlayer();
                     if (player != null) player.seekTo(progress);
@@ -88,42 +101,50 @@ public class MainActivity extends AppCompatActivity {
         startService(intent);
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        if (requestCode == REQUEST_PERMISSION && grantResults.length > 0
-                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            loadSongs();
-        } else {
-            Toast.makeText(this, "Permission denied", Toast.LENGTH_SHORT).show();
-        }
-    }
-
     private void loadSongs() {
         File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
         songList = findSongs(musicDir);
         ArrayList<String> songNames = new ArrayList<>();
-
-        for (File song : songList) {
-            songNames.add(song.getName());
-        }
+        for (File song : songList) songNames.add(song.getName());
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, songNames);
         listView.setAdapter(adapter);
 
         listView.setOnItemClickListener((parent, view, position, id) -> {
             currentSongIndex = position;
-            File selectedSong = songList.get(currentSongIndex);
-
-            extractMetadata(selectedSong.getAbsolutePath());
-
-            Intent intent = new Intent(MainActivity.this, MusicService.class);
-            intent.setAction(MusicService.ACTION_START);
-            intent.putExtra("song_path", selectedSong.getAbsolutePath());
-            startService(intent);
-
-            albumArt.startAnimation(rotateAnim); // start spinning
-            startSeekBarUpdate();
+            playCurrentSong();
         });
+    }
+
+    private void playCurrentSong() {
+        if (currentSongIndex < 0 || currentSongIndex >= songList.size()) return;
+        File selectedSong = songList.get(currentSongIndex);
+
+        extractMetadata(selectedSong.getAbsolutePath());
+
+        Intent intent = new Intent(this, MusicService.class);
+        intent.setAction(MusicService.ACTION_START);
+        intent.putExtra("song_path", selectedSong.getAbsolutePath());
+        startService(intent);
+
+        playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
+        albumArt.startAnimation(rotateAnim);
+        isPlaying = true;
+        startSeekBarUpdate();
+    }
+
+    private void playNext() {
+        if (songList != null && !songList.isEmpty()) {
+            currentSongIndex = (currentSongIndex + 1) % songList.size();
+            playCurrentSong();
+        }
+    }
+
+    private void playPrevious() {
+        if (songList != null && !songList.isEmpty()) {
+            currentSongIndex = (currentSongIndex - 1 + songList.size()) % songList.size();
+            playCurrentSong();
+        }
     }
 
     private void startSeekBarUpdate() {
@@ -145,7 +166,6 @@ public class MainActivity extends AppCompatActivity {
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
         try {
             retriever.setDataSource(path);
-
             String title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
             String artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
             String durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
@@ -164,8 +184,9 @@ public class MainActivity extends AppCompatActivity {
                 Bitmap bitmap = BitmapFactory.decodeByteArray(art, 0, art.length);
                 albumArt.setImageBitmap(bitmap);
             } else {
-                albumArt.setImageResource(R.drawable.ic_music_note);
+                albumArt.setImageResource(android.R.drawable.ic_media_play);
             }
+
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -196,5 +217,15 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         return songs;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == REQUEST_PERMISSION && grantResults.length > 0 &&
+                grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            loadSongs();
+        } else {
+            Toast.makeText(this, "Permission denied", Toast.LENGTH_SHORT).show();
+        }
     }
 }
