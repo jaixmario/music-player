@@ -13,6 +13,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.material.imageview.ShapeableImageView;
+import com.google.android.material.slider.Slider;
 
 import java.io.*;
 import java.util.*;
@@ -23,7 +24,7 @@ public class MainActivity extends AppCompatActivity {
     private ImageButton playPauseButton, nextButton, prevButton;
     private ShapeableImageView albumArt;
     private TextView titleText, artistText, currentTimeText, durationText;
-    private SeekBar seekBar;
+    private Slider seekBar;
     private ArrayList<File> songList;
     private int currentSongIndex = -1;
     private final int REQUEST_PERMISSION = 1001;
@@ -75,16 +76,13 @@ public class MainActivity extends AppCompatActivity {
         nextButton.setOnClickListener(v -> playNext());
         prevButton.setOnClickListener(v -> playPrevious());
 
-        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
-                if (fromUser) {
-                    MediaPlayer player = MusicService.getMediaPlayer();
-                    if (player != null) player.seekTo(progress);
+        seekBar.addOnChangeListener((slider, value, fromUser) -> {
+            if (fromUser) {
+                MediaPlayer player = MusicService.getMediaPlayer();
+                if (player != null) {
+                    player.seekTo((int) value);
                 }
             }
-
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {}
         });
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
@@ -193,7 +191,7 @@ public class MainActivity extends AppCompatActivity {
                 MediaPlayer player = MusicService.getMediaPlayer();
                 if (player != null && player.isPlaying()) {
                     int currentPos = player.getCurrentPosition();
-                    seekBar.setProgress(currentPos);
+                    seekBar.setValue(currentPos);
                     currentTimeText.setText(millisecondsToTimer(currentPos));
                 }
                 handler.postDelayed(this, 500);
@@ -215,7 +213,7 @@ public class MainActivity extends AppCompatActivity {
 
             if (duration != null) {
                 int ms = Integer.parseInt(duration);
-                seekBar.setMax(ms);
+                seekBar.setValueTo(ms);
                 durationText.setText(millisecondsToTimer(ms));
             }
 
