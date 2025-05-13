@@ -98,22 +98,28 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onResume() {
-        super.onResume();
-        registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
+    super.onResume();
+    registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
 
-        String currentPath = MusicService.getCurrentPath();
-        if (currentPath != null) {
-            extractMetadata(currentPath);
-            playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
-            albumArt.startAnimation(rotateAnim);
-            startSeekBarUpdate();
-        } else {
-            int index = prefs.getInt("last_index", -1);
-            if (index != -1 && songList != null && index < songList.size()) {
-                currentSongIndex = index;
-                extractMetadata(songList.get(index).getAbsolutePath());
-            }
+    String currentPath = MusicService.getCurrentPath();
+    MediaPlayer player = MusicService.getMediaPlayer();
+
+    if (currentPath != null && player != null && player.isPlaying()) {
+        extractMetadata(currentPath);
+        playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
+        albumArt.startAnimation(rotateAnim);
+        startSeekBarUpdate();
+    } else {
+        int index = prefs.getInt("last_index", -1);
+        if (index != -1 && songList != null && index < songList.size()) {
+            currentSongIndex = index;
+            extractMetadata(songList.get(index).getAbsolutePath());
+            playPauseButton.setImageResource(android.R.drawable.ic_media_play);
+            albumArt.clearAnimation();
+            seekBar.setProgress(0);
+            currentTimeText.setText("0:00");
         }
+    }
     }
 
     @Override
