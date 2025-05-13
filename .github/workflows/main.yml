@@ -51,3 +51,26 @@ jobs:
         with:
           name: app-release.apk
           path: app/build/outputs/apk/release/app-release.apk
+
+      - name: Send APK and report to Telegram
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          send_file() {
+            FILE=$1
+            CAPTION=$2
+            if [ -f "$FILE" ]; then
+              curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+                -F chat_id="${TELEGRAM_CHAT_ID}" \
+                -F document=@"$FILE" \
+                -F caption="$CAPTION"
+              echo "✅ Sent: $FILE"
+            else
+              echo "⚠️ File not found: $FILE"
+            fi
+          }
+
+          send_file "app/build/outputs/apk/release/app-release.apk" "Here is the latest APK"
+          send_file "build/reports/problems/problems-report.html" "Here is the problems report"
