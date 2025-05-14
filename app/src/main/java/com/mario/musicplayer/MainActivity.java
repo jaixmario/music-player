@@ -118,8 +118,8 @@ public class MainActivity extends AppCompatActivity {
             albumArt.clearAnimation();
             seekBar.setProgress(0);
             currentTimeText.setText("0:00");
+            }
         }
-    }
     }
 
     @Override
