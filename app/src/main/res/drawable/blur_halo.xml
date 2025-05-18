@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="oval">
+
     <gradient
         android:type="radial"
         android:gradientRadius="90dp"
-        android:startColor="#AAFF4081"   <!-- Start color -->
-        android:centerColor="#55FF4081"  <!-- Mid soft glow -->
-        android:endColor="#00FF4081"     <!-- Transparent outer edge -->
+        android:startColor="#AAFF4081"
+        android:centerColor="#55FF4081"
+        android:endColor="#00FF4081"
         android:useLevel="false" />
+        
 </shape>
