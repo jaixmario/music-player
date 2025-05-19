@@ -7,21 +7,19 @@
     android:padding="12dp"
     android:gravity="center_horizontal">
 
-    <!-- Album Art with Blur Halo -->
+    <!-- Album Art with Dynamic Blur -->
     <FrameLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center">
 
-        <!-- Blurred Halo Background -->
-        <View
-            android:id="@+id/blurHalo"
+        <ImageView
+            android:id="@+id/blurGlow"
             android:layout_width="180dp"
             android:layout_height="180dp"
             android:layout_gravity="center"
-            android:background="@drawable/blur_halo" />
+            android:scaleType="centerCrop" />
 
-        <!-- Circular Album Art -->
         <com.google.android.material.imageview.ShapeableImageView
             android:id="@+id/albumArt"
             android:layout_width="150dp"

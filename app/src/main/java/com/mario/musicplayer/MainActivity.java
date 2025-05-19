@@ -11,6 +11,7 @@ import android.content.pm.PackageManager;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.palette.graphics.Palette;
 
 import com.google.android.material.imageview.ShapeableImageView;
 
@@ -22,6 +23,7 @@ public class MainActivity extends AppCompatActivity {
     private ListView listView;
     private ImageButton playPauseButton, nextButton, prevButton;
     private ShapeableImageView albumArt;
+    private ImageView blurGlow;
     private TextView titleText, artistText, currentTimeText, durationText;
     private SeekBar seekBar;
     private ArrayList<File> songList;
@@ -64,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
         nextButton = findViewById(R.id.nextButton);
         prevButton = findViewById(R.id.prevButton);
         albumArt = findViewById(R.id.albumArt);
+        blurGlow = findViewById(R.id.blurGlow);
         titleText = findViewById(R.id.titleText);
         artistText = findViewById(R.id.artistText);
         currentTimeText = findViewById(R.id.currentTime);
@@ -98,26 +101,26 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onResume() {
-    super.onResume();
-    registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
+        super.onResume();
+        registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
 
-    String currentPath = MusicService.getCurrentPath();
-    MediaPlayer player = MusicService.getMediaPlayer();
+        String currentPath = MusicService.getCurrentPath();
+        MediaPlayer player = MusicService.getMediaPlayer();
 
-    if (currentPath != null && player != null && player.isPlaying()) {
-        extractMetadata(currentPath);
-        playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
-        albumArt.startAnimation(rotateAnim);
-        startSeekBarUpdate();
-    } else {
-        int index = prefs.getInt("last_index", -1);
-        if (index != -1 && songList != null && index < songList.size()) {
-            currentSongIndex = index;
-            extractMetadata(songList.get(index).getAbsolutePath());
-            playPauseButton.setImageResource(android.R.drawable.ic_media_play);
-            albumArt.clearAnimation();
-            seekBar.setProgress(0);
-            currentTimeText.setText("0:00");
+        if (currentPath != null && player != null && player.isPlaying()) {
+            extractMetadata(currentPath);
+            playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
+            albumArt.startAnimation(rotateAnim);
+            startSeekBarUpdate();
+        } else {
+            int index = prefs.getInt("last_index", -1);
+            if (index != -1 && songList != null && index < songList.size()) {
+                currentSongIndex = index;
+                extractMetadata(songList.get(index).getAbsolutePath());
+                playPauseButton.setImageResource(android.R.drawable.ic_media_play);
+                albumArt.clearAnimation();
+                seekBar.setProgress(0);
+                currentTimeText.setText("0:00");
             }
         }
     }
@@ -228,6 +231,7 @@ public class MainActivity extends AppCompatActivity {
             if (art != null) {
                 Bitmap bitmap = BitmapFactory.decodeByteArray(art, 0, art.length);
                 albumArt.setImageBitmap(bitmap);
+                applyDynamicBlur(bitmap);
             } else {
                 albumArt.setImageResource(android.R.drawable.ic_media_play);
             }
@@ -240,6 +244,32 @@ public class MainActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
         }
+    }
+
+    private void applyDynamicBlur(Bitmap albumBitmap) {
+        if (albumBitmap == null) return;
+
+        Palette.from(albumBitmap).generate(palette -> {
+            int dominantColor = palette != null ? palette.getDominantColor(Color.WHITE) : Color.WHITE;
+
+            Bitmap blurBitmap = Bitmap.createBitmap(180, 180, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(blurBitmap);
+
+            Paint colorPaint = new Paint();
+            colorPaint.setColor(dominantColor);
+            colorPaint.setAntiAlias(true);
+            colorPaint.setMaskFilter(new BlurMaskFilter(40f, BlurMaskFilter.Blur.NORMAL));
+            canvas.drawCircle(90f, 90f, 60f, colorPaint);
+
+            Paint whitePaint = new Paint();
+            whitePaint.setColor(Color.WHITE);
+            whitePaint.setAlpha(60);
+            whitePaint.setAntiAlias(true);
+            whitePaint.setMaskFilter(new BlurMaskFilter(25f, BlurMaskFilter.Blur.NORMAL));
+            canvas.drawCircle(90f, 90f, 65f, whitePaint);
+
+            blurGlow.setImageBitmap(blurBitmap);
+        });
     }
 
     private String millisecondsToTimer(int ms) {
