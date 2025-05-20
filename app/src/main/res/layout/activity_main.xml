@@ -123,14 +123,15 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Mini Player Include -->
-    <include layout="@layout/mini_player" />
-
-    <!-- ListView for Songs -->
+    <!-- ListView for Songs (placed above mini player) -->
     <ListView
         android:id="@+id/listView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:dividerHeight="1dp" />
+
+    <!-- Mini Player at the bottom -->
+    <include layout="@layout/mini_player" />
+
 </LinearLayout>
