@@ -122,30 +122,48 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onResume() {
-        super.onResume();
-        registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
+    super.onResume();
+    registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
 
-        String currentPath = MusicService.getCurrentPath();
-        MediaPlayer player = MusicService.getMediaPlayer();
+    String currentPath = MusicService.getCurrentPath();
+    MediaPlayer player = MusicService.getMediaPlayer();
 
-        if (songList == null || songList.isEmpty()) {
-            loadSongs();
+    if (songList == null || songList.isEmpty()) {
+        loadSongs();
+    }
+
+    if (currentSongIndex == -1) {
+        currentSongIndex = prefs.getInt("last_index", -1);
+    }
+
+    if (currentPath != null && player != null) {
+        extractMetadata(currentPath);
+        updateMiniPlayerUI();
+
+        int duration = player.getDuration();
+        seekBar.setMax(duration);
+        durationText.setText(millisecondsToTimer(duration));
+
+        int currentPos = player.getCurrentPosition();
+        seekBar.setProgress(currentPos);
+        currentTimeText.setText(millisecondsToTimer(currentPos));
+
+        playPauseButton.setImageResource(player.isPlaying()
+                ? android.R.drawable.ic_media_pause
+                : android.R.drawable.ic_media_play);
+
+        miniPlayPause.setImageResource(player.isPlaying()
+                ? android.R.drawable.ic_media_pause
+                : android.R.drawable.ic_media_play);
+
+        if (player.isPlaying()) {
+            albumArt.startAnimation(rotateAnim);
+            startSeekBarUpdate();
+        } else {
+            albumArt.clearAnimation();
         }
 
-        if (currentSongIndex == -1) {
-            currentSongIndex = prefs.getInt("last_index", -1);
-        }
-
-        if (currentSongIndex != -1 && currentSongIndex < songList.size()) {
-            File song = songList.get(currentSongIndex);
-            if (currentPath != null && player != null) {
-                extractMetadata(song.getAbsolutePath());
-                updateMiniPlayerUI();
-                miniPlayer.setVisibility(View.VISIBLE);
-                miniPlayPause.setImageResource(player.isPlaying() ?
-                        android.R.drawable.ic_media_pause :
-                        android.R.drawable.ic_media_play);
-            }
+        miniPlayer.setVisibility(View.VISIBLE);
         }
     }
 
