@@ -58,32 +58,12 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # Extract version info from Gradle file
-          VERSION_NAME=$(grep 'versionName' app/build.gradle.kts | sed 's/.*".*".*/\1/')
-          VERSION_CODE=$(grep 'versionCode' app/build.gradle.kts | grep -o '[0-9]\+')
-
-          # Get latest commit details
-          COMMIT_HASH=$(git rev-parse --short HEAD)
-          COMMIT_MESSAGE=$(git log -1 --pretty=%s)
-          COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
-
-          # Escape message for Telegram Markdown
-          ESCAPED_COMMIT_MESSAGE=$(echo "$COMMIT_MESSAGE" | sed 's/[][_*`]/\\\1/g')
-
-          # Prepare caption
-          CAPTION="*APK Build Info*
-*Version:* v$VERSION_NAME ($VERSION_CODE)
-*Commit:* \`$COMMIT_HASH\`
-*Message:* $ESCAPED_COMMIT_MESSAGE
-*Author:* $COMMIT_AUTHOR"
-
-          # Send function
           send_file() {
             FILE=$1
+            CAPTION=$2
             if [ -f "$FILE" ]; then
               curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
                 -F chat_id="${TELEGRAM_CHAT_ID}" \
-                -F parse_mode="Markdown" \
                 -F document=@"$FILE" \
                 -F caption="$CAPTION"
               echo "✅ Sent: $FILE"
@@ -92,5 +72,5 @@ jobs:
             fi
           }
 
-          send_file "app/build/outputs/apk/release/app-release.apk"
-          send_file "build/reports/problems/problems-report.html"
+          send_file "app/build/outputs/apk/release/app-release.apk" "Here is the latest APK"
+          send_file "build/reports/problems/problems-report.html" "Here is the problems report"
