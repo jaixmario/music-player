@@ -18,7 +18,6 @@ import androidx.palette.graphics.Palette;
 import com.google.android.material.imageview.ShapeableImageView;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
@@ -230,7 +229,6 @@ public class MainActivity extends AppCompatActivity {
         }, 0);
     }
 
-    
     private void extractMetadata(String path) {
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
         try {
@@ -259,7 +257,11 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            retriever.release(); 
+            try {
+                retriever.release();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -282,7 +284,11 @@ public class MainActivity extends AppCompatActivity {
             miniAlbumArt.setImageResource(android.R.drawable.ic_media_play);
         }
 
-        retriever.release();
+        try {
+            retriever.release();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private void applyDynamicBlur(Bitmap albumBitmap) {
