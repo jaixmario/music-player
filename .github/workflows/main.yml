@@ -24,7 +24,7 @@ jobs:
       - name: 3️⃣ Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: 4️⃣ Fix gradlew line endings
+      - name: 4️⃣ Fix gradlew line endings and permission
         run: |
           sudo apt-get update
           sudo apt-get install -y dos2unix
@@ -50,49 +50,44 @@ jobs:
           name: app-release.apk
           path: app/build/outputs/apk/release/app-release.apk
 
-      - name: 8️⃣ Send APK to Telegram
+      - name: 8️⃣ Notify Telegram
         if: always()
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # Extract version info
           VERSION_NAME=$(grep 'versionName' app/build.gradle.kts | cut -d '"' -f2)
           VERSION_CODE=$(grep 'versionCode' app/build.gradle.kts | grep -o '[0-9]\+')
 
-          # Commit details
           COMMIT_HASH=$(git rev-parse --short HEAD)
           COMMIT_MESSAGE=$(git log -1 --pretty=%s)
           COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
-
-          # Current IST timestamp
           TIMESTAMP=$(TZ="Asia/Kolkata" date +"%d %b %Y, %I:%M %p")
 
-          # Escape Markdown characters
-          ESCAPED_COMMIT_MESSAGE=$(echo "$COMMIT_MESSAGE" | sed 's/[][\\`_*]/\\&/g')
-
-          # Caption with markdown
-          CAPTION="*✅ Android Build Completed*\n\n\
-          *1. Version:* v$VERSION_NAME \`($VERSION_CODE)\`\n\
-          *2. Commit:* \`$COMMIT_HASH\`\n\
-          *3. Message:* _${ESCAPED_COMMIT_MESSAGE}_\n\
-          *4. Author:* $COMMIT_AUTHOR\n\
-          *5. Time:* $TIMESTAMP (IST)\n\
-          \n📦 *Artifact:* app-release.apk"
-
-          # Send function
-          send_file() {
-            FILE=$1
-            if [ -f "$FILE" ]; then
-              curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
-                -F chat_id="${TELEGRAM_CHAT_ID}" \
-                -F parse_mode="Markdown" \
-                -F document=@"$FILE" \
-                -F caption="$CAPTION"
-              echo "✅ Sent: $FILE"
-            else
-              echo "⚠️ File not found: $FILE"
-            fi
+          # Escape Markdown V2
+          escape_markdown() {
+            echo "$1" | sed -e 's/[_*[\]()~`>#+=|{}.!-]/\\&/g'
           }
 
-          send_file "app/build/outputs/apk/release/app-release.apk"
+          ESCAPED_MESSAGE=$(escape_markdown "$COMMIT_MESSAGE")
+          ESCAPED_AUTHOR=$(escape_markdown "$COMMIT_AUTHOR")
+
+          CAPTION="*✅ Android Build Completed*\n\n\
+*Version:* *v${VERSION_NAME}* (${VERSION_CODE})\n\
+*Commit:* \`${COMMIT_HASH}\`\n\
+*Message:* \`${ESCAPED_MESSAGE}\`\n\
+*Author:* *${ESCAPED_AUTHOR}*\n\
+*Time:* ${TIMESTAMP} (IST)\n\n\
+📦 *Artifact:* app-release.apk"
+
+          FILE="app/build/outputs/apk/release/app-release.apk"
+          if [ -f "$FILE" ]; then
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+              -F chat_id="${TELEGRAM_CHAT_ID}" \
+              -F parse_mode="Markdown" \
+              -F document=@"$FILE" \
+              -F caption="$CAPTION"
+            echo "✅ APK sent to Telegram"
+          else
+            echo "❌ APK not found"
+          fi
