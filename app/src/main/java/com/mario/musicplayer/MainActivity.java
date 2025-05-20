@@ -230,6 +230,7 @@ public class MainActivity extends AppCompatActivity {
         }, 0);
     }
 
+    
     private void extractMetadata(String path) {
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
         try {
@@ -258,11 +259,7 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            try {
-                retriever.release();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            retriever.release(); 
         }
     }
 
