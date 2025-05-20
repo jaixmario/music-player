@@ -131,50 +131,44 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onResume() {
-        super.onResume();
+    super.onResume();
 
-        if (songList == null || songList.isEmpty()) {
-            loadSongs();
-        }
+    currentSongIndex = prefs.getInt("last_index", -1);
+    String currentPath = MusicService.getCurrentPath();
 
-        currentSongIndex = prefs.getInt("last_index", -1);
+    if (currentPath != null) {
+        extractMetadata(currentPath); // Force refresh title/art
+        updateMiniPlayerUI();
+        miniPlayer.setVisibility(View.VISIBLE);
+    }
 
-        MediaPlayer player = MusicService.getMediaPlayer();
-        String currentPath = MusicService.getCurrentPath();
+    MediaPlayer player = MusicService.getMediaPlayer();
+    if (player != null) {
+        int duration = player.getDuration();
+        seekBar.setMax(duration);
+        durationText.setText(millisecondsToTimer(duration));
 
-        if (player != null && currentPath != null
-                && currentSongIndex >= 0 && currentSongIndex < songList.size()) {
+        int currentPos = player.getCurrentPosition();
+        seekBar.setProgress(currentPos);
+        currentTimeText.setText(millisecondsToTimer(currentPos));
 
-            extractMetadata(currentPath);
-            updateMiniPlayerUI();
+        playPauseButton.setImageResource(player.isPlaying()
+            ? android.R.drawable.ic_media_pause
+            : android.R.drawable.ic_media_play);
+        miniPlayPause.setImageResource(player.isPlaying()
+            ? android.R.drawable.ic_media_pause
+            : android.R.drawable.ic_media_play);
 
-            int duration = player.getDuration();
-            seekBar.setMax(duration);
-            durationText.setText(millisecondsToTimer(duration));
-
-            int currentPos = player.getCurrentPosition();
-            seekBar.setProgress(currentPos);
-            currentTimeText.setText(millisecondsToTimer(currentPos));
-
-            playPauseButton.setImageResource(player.isPlaying()
-                    ? android.R.drawable.ic_media_pause
-                    : android.R.drawable.ic_media_play);
-            miniPlayPause.setImageResource(player.isPlaying()
-                    ? android.R.drawable.ic_media_pause
-                    : android.R.drawable.ic_media_play);
-
-            if (player.isPlaying()) {
-                albumArt.startAnimation(rotateAnim);
-                startSeekBarUpdate();
-            } else {
-                albumArt.clearAnimation();
-            }
-
-            miniPlayer.setVisibility(View.VISIBLE);
+        if (player.isPlaying()) {
+            albumArt.startAnimation(rotateAnim);
+            startSeekBarUpdate();
         } else {
-            miniPlayer.setVisibility(View.GONE);
-            fullPlayerLayout.setVisibility(View.GONE);
+            albumArt.clearAnimation();
         }
+    } else {
+        miniPlayer.setVisibility(View.GONE);
+        fullPlayerLayout.setVisibility(View.GONE);
+    }
     }
 
     @Override
