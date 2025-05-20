@@ -59,7 +59,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           # Extract version info from Gradle file
-          VERSION_NAME=$(grep 'versionName' app/build.gradle.kts | sed 's/.*".*".*/\1/')
+          VERSION_NAME=$(grep 'versionName' app/build.gradle.kts | cut -d '"' -f2)
           VERSION_CODE=$(grep 'versionCode' app/build.gradle.kts | grep -o '[0-9]\+')
 
           # Get latest commit details
@@ -67,8 +67,8 @@ jobs:
           COMMIT_MESSAGE=$(git log -1 --pretty=%s)
           COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
 
-          # Escape message for Telegram Markdown
-          ESCAPED_COMMIT_MESSAGE=$(echo "$COMMIT_MESSAGE" | sed 's/[\`_*[]/\\&/g')
+          # Escape special characters for Telegram Markdown
+          ESCAPED_COMMIT_MESSAGE=$(echo "$COMMIT_MESSAGE" | sed 's/[][\\`_*]/\\&/g')
 
           # Prepare caption
           CAPTION="*APK Build Info*\n*Version:* v$VERSION_NAME ($VERSION_CODE)\n*Commit:* \`$COMMIT_HASH\`\n*Message:* $ESCAPED_COMMIT_MESSAGE\n*Author:* $COMMIT_AUTHOR"
