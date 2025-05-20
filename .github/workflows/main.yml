@@ -58,22 +58,24 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          # Extract version info from Gradle file
           VERSION_NAME=$(grep 'versionName' app/build.gradle.kts | cut -d '"' -f2)
           VERSION_CODE=$(grep 'versionCode' app/build.gradle.kts | grep -o '[0-9]\+')
 
-          # Get latest commit details
           COMMIT_HASH=$(git rev-parse --short HEAD)
           COMMIT_MESSAGE=$(git log -1 --pretty=%s)
           COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
 
-          # Escape special characters for Telegram Markdown
           ESCAPED_COMMIT_MESSAGE=$(echo "$COMMIT_MESSAGE" | sed 's/[][\\`_*]/\\&/g')
 
-          # Prepare caption
-          CAPTION="*APK Build Info*\n*Version:* v$VERSION_NAME ($VERSION_CODE)\n*Commit:* \`$COMMIT_HASH\`\n*Message:* $ESCAPED_COMMIT_MESSAGE\n*Author:* $COMMIT_AUTHOR"
+          CAPTION=$(cat <<EOF
+          ✅ *New APK Build Uploaded!*
+          🧾 *Version:* v$VERSION_NAME ($VERSION_CODE)  
+          🔀 *Commit:* \`$COMMIT_HASH\`  
+          📝 *Message:* _$ESCAPED_COMMIT_MESSAGE_  
+          👤 *Author:* *$COMMIT_AUTHOR*
+          EOF
+          )
 
-          # Send function
           send_file() {
             FILE=$1
             if [ -f "$FILE" ]; then
