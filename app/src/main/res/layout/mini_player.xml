@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Mini Player Layout with Black Background -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/miniPlayer"
     android:layout_width="match_parent"
@@ -6,10 +7,11 @@
     android:orientation="horizontal"
     android:gravity="center_vertical"
     android:padding="8dp"
-    android:background="#000000"  <!-- Black background -->
+    android:background="#000000" <!-- REMOVE THE COMMENT HERE -->
     android:clickable="true"
     android:focusable="true">
 
+    <!-- Other elements remain unchanged -->
     <ImageView
         android:id="@+id/miniAlbumArt"
         android:layout_width="48dp"
@@ -30,7 +32,7 @@
             android:maxLines="1"
             android:ellipsize="end"
             android:textSize="14sp"
-            android:textColor="#FFFFFF"  <!-- White text -->
+            android:textColor="#FFFFFF"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
 
@@ -40,7 +42,7 @@
             android:maxLines="1"
             android:ellipsize="end"
             android:textSize="12sp"
-            android:textColor="#FFFFFF"  <!-- White text -->
+            android:textColor="#FFFFFF"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
     </LinearLayout>
