@@ -6,6 +6,7 @@ import android.media.*;
 import android.os.*;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
+
 import java.io.*;
 import java.util.*;
 
@@ -31,7 +32,10 @@ public class MusicService extends Service {
     }
 
     public static String getCurrentPath() {
-        return instance != null && instance.mediaPlayer != null && instance.mediaPlayer.isPlaying()
+        return (instance != null &&
+                instance.mediaPlayer != null &&
+                instance.currentIndex >= 0 &&
+                instance.currentIndex < instance.songList.size())
                 ? instance.songList.get(instance.currentIndex).getAbsolutePath()
                 : null;
     }
@@ -49,10 +53,13 @@ public class MusicService extends Service {
         String action = intent.getAction();
         if (ACTION_START.equals(action)) {
             String path = intent.getStringExtra("song_path");
-            currentIndex = prefs.getInt("last_index", -1);
-            extractMetadata(path);
-            startMediaPlayer(path);
-            sendBroadcastUpdate("started", path);
+            if (path != null) {
+                currentIndex = findIndexByPath(path);
+                prefs.edit().putInt("last_index", currentIndex).apply();
+                extractMetadata(path);
+                startMediaPlayer(path);
+                sendBroadcastUpdate("started", path);
+            }
 
         } else if (ACTION_PAUSE.equals(action)) {
             if (mediaPlayer != null && mediaPlayer.isPlaying()) {
@@ -98,6 +105,7 @@ public class MusicService extends Service {
             mediaPlayer.setOnCompletionListener(mp -> {
                 currentIndex++;
                 if (currentIndex >= songList.size()) {
+                    sendBroadcastUpdate("stopped", null);
                     stopForeground(true);
                     stopSelf();
                 } else {
@@ -117,8 +125,9 @@ public class MusicService extends Service {
     private void playSongAt(int index) {
         if (index < 0 || index >= songList.size()) return;
         File file = songList.get(index);
-        extractMetadata(file.getAbsolutePath());
+        currentIndex = index;
         prefs.edit().putInt("last_index", index).apply();
+        extractMetadata(file.getAbsolutePath());
         startMediaPlayer(file.getAbsolutePath());
         sendBroadcastUpdate("next", file.getAbsolutePath());
     }
@@ -188,9 +197,19 @@ public class MusicService extends Service {
         }
     }
 
+    private int findIndexByPath(String path) {
+        for (int i = 0; i < songList.size(); i++) {
+            if (songList.get(i).getAbsolutePath().equals(path)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
+        sendBroadcastUpdate("stopped", null);  // let UI hide player
         if (mediaPlayer != null) {
             mediaPlayer.release();
             mediaPlayer = null;
