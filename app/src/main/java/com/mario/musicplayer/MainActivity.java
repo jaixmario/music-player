@@ -146,6 +146,7 @@ public class MainActivity extends AppCompatActivity {
     public void onBackPressed() {
         if (fullPlayerLayout.getVisibility() == View.VISIBLE) {
             fullPlayerLayout.setVisibility(View.GONE);
+            miniPlayer.setVisibility(View.VISIBLE); 
         } else {
             super.onBackPressed();
         }
@@ -337,5 +338,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void showFullPlayer() {
         fullPlayerLayout.setVisibility(View.VISIBLE);
+        miniPlayer.setVisibility(View.GONE);
     }
 }
