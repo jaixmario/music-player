@@ -125,18 +125,16 @@ public class MainActivity extends AppCompatActivity {
     super.onResume();
     registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
 
-    String currentPath = MusicService.getCurrentPath();
-    MediaPlayer player = MusicService.getMediaPlayer();
-
     if (songList == null || songList.isEmpty()) {
         loadSongs();
     }
 
-    if (currentSongIndex == -1) {
-        currentSongIndex = prefs.getInt("last_index", -1);
-    }
+    currentSongIndex = prefs.getInt("last_index", -1);
 
-    if (currentPath != null && player != null) {
+    MediaPlayer player = MusicService.getMediaPlayer();
+    String currentPath = MusicService.getCurrentPath();
+
+    if (player != null && currentPath != null && currentSongIndex >= 0 && currentSongIndex < songList.size()) {
         extractMetadata(currentPath);
         updateMiniPlayerUI();
 
@@ -151,7 +149,6 @@ public class MainActivity extends AppCompatActivity {
         playPauseButton.setImageResource(player.isPlaying()
                 ? android.R.drawable.ic_media_pause
                 : android.R.drawable.ic_media_play);
-
         miniPlayPause.setImageResource(player.isPlaying()
                 ? android.R.drawable.ic_media_pause
                 : android.R.drawable.ic_media_play);
@@ -164,6 +161,11 @@ public class MainActivity extends AppCompatActivity {
         }
 
         miniPlayer.setVisibility(View.VISIBLE);
+
+    } else {
+        // Safe fallback: hide players
+        miniPlayer.setVisibility(View.GONE);
+        fullPlayerLayout.setVisibility(View.GONE);
         }
     }
 
