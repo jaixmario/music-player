@@ -128,11 +128,24 @@ public class MainActivity extends AppCompatActivity {
         String currentPath = MusicService.getCurrentPath();
         MediaPlayer player = MusicService.getMediaPlayer();
 
-        if (currentPath != null && player != null && player.isPlaying()) {
-            extractMetadata(currentPath);
-            updateMiniPlayerUI();
-            miniPlayer.setVisibility(View.VISIBLE);
-            miniPlayPause.setImageResource(android.R.drawable.ic_media_pause);
+        if (songList == null || songList.isEmpty()) {
+            loadSongs();
+        }
+
+        if (currentSongIndex == -1) {
+            currentSongIndex = prefs.getInt("last_index", -1);
+        }
+
+        if (currentSongIndex != -1 && currentSongIndex < songList.size()) {
+            File song = songList.get(currentSongIndex);
+            if (currentPath != null && player != null) {
+                extractMetadata(song.getAbsolutePath());
+                updateMiniPlayerUI();
+                miniPlayer.setVisibility(View.VISIBLE);
+                miniPlayPause.setImageResource(player.isPlaying() ?
+                        android.R.drawable.ic_media_pause :
+                        android.R.drawable.ic_media_play);
+            }
         }
     }
 
@@ -267,6 +280,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateMiniPlayerUI() {
+        if (songList == null || currentSongIndex < 0 || currentSongIndex >= songList.size()) return;
+
         File song = songList.get(currentSongIndex);
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
         retriever.setDataSource(song.getAbsolutePath());
