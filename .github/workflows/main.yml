@@ -30,15 +30,15 @@ jobs:
           sudo apt-get install -y dos2unix
           dos2unix ./gradlew
 
-      - name: Give execute permission to gradlew
+      - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Decode release.keystore
+      - name: Decode Keystore
         env:
           KEYSTORE_FILE_BASE64: ${{ secrets.KEYSTORE_FILE_BASE64 }}
         run: echo "$KEYSTORE_FILE_BASE64" | base64 --decode > ${{ github.workspace }}/release.keystore
 
-      - name: Build signed release APK
+      - name: Build Signed APK
         env:
           KEYSTORE_PATH:      ${{ github.workspace }}/release.keystore
           KEYSTORE_PASSWORD:  ${{ secrets.KEYSTORE_PASSWORD }}
@@ -46,13 +46,13 @@ jobs:
           KEY_PASSWORD:       ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleRelease
 
-      - name: Upload Release APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release.apk
           path: app/build/outputs/apk/release/app-release.apk
 
-      - name: Send APK and report to Telegram
+      - name: Send APK and Report to Telegram
         if: always()
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -60,35 +60,10 @@ jobs:
         run: |
           VERSION_NAME=$(grep 'versionName' app/build.gradle.kts | cut -d '"' -f2)
           VERSION_CODE=$(grep 'versionCode' app/build.gradle.kts | grep -o '[0-9]\+')
-
           COMMIT_HASH=$(git rev-parse --short HEAD)
           COMMIT_MESSAGE=$(git log -1 --pretty=%s)
           COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
+          COMMIT_URL="https://github.com/${{ github.repository }}/commit/$(git rev-parse HEAD)"
 
-          ESCAPED_COMMIT_MESSAGE=$(echo "$COMMIT_MESSAGE" | sed 's/[][\\`_*]/\\&/g')
-
-          CAPTION=$(cat <<EOF
-          ✅ *New APK Build Uploaded!*
-          🧾 *Version:* v$VERSION_NAME ($VERSION_CODE)  
-          🔀 *Commit:* \`$COMMIT_HASH\`  
-          📝 *Message:* _$ESCAPED_COMMIT_MESSAGE_  
-          👤 *Author:* *$COMMIT_AUTHOR*
-          EOF
-          )
-
-          send_file() {
-            FILE=$1
-            if [ -f "$FILE" ]; then
-              curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
-                -F chat_id="${TELEGRAM_CHAT_ID}" \
-                -F parse_mode="Markdown" \
-                -F document=@"$FILE" \
-                -F caption="$CAPTION"
-              echo "✅ Sent: $FILE"
-            else
-              echo "⚠️ File not found: $FILE"
-            fi
-          }
-
-          send_file "app/build/outputs/apk/release/app-release.apk"
-          send_file "build/reports/problems/problems-report.html"
+          escape_md() {
+            echo "$1" | sed -E 's/([_*
