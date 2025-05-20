@@ -73,12 +73,12 @@ jobs:
           ESCAPED_AUTHOR=$(escape_markdown "$COMMIT_AUTHOR")
 
           CAPTION="*✅ Android Build Completed*\n\n\
-*Version:* *v${VERSION_NAME}* (${VERSION_CODE})\n\
-*Commit:* \`${COMMIT_HASH}\`\n\
-*Message:* \`${ESCAPED_MESSAGE}\`\n\
-*Author:* *${ESCAPED_AUTHOR}*\n\
-*Time:* ${TIMESTAMP} (IST)\n\n\
-📦 *Artifact:* app-release.apk"
+          *Version:* *v${VERSION_NAME}* (${VERSION_CODE})\n\
+          *Commit:* \`${COMMIT_HASH}\`\n\
+          *Message:* \`${ESCAPED_MESSAGE}\`\n\
+          *Author:* *${ESCAPED_AUTHOR}*\n\
+          *Time:* ${TIMESTAMP} (IST)\n\n\
+          📦 *Artifact:* app-release.apk"
 
           FILE="app/build/outputs/apk/release/app-release.apk"
           if [ -f "$FILE" ]; then
