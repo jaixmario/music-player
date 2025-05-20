@@ -53,7 +53,7 @@ jobs:
           path: app/build/outputs/apk/release/app-release.apk
 
       - name: Send APK and report to Telegram
-        if: always()
+        if: success()
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -68,19 +68,14 @@ jobs:
           COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
 
           # Escape special characters for Telegram Markdown
-          ESCAPED_COMMIT_MESSAGE=$(echo "$COMMIT_MESSAGE" | sed 's/[][\\`_*]/\\&/g')
+          ESCAPED_COMMIT_MESSAGE=$(echo "$COMMIT_MESSAGE" | sed -e 's/\\/\\\\/g' -e 's/\`/\\`/g' -e 's//\/g' -e 's//\/g' -e 's/(/\/g' -e 's/)/\/g' -e 's/\*/\\*/g' -e 's/_/\\_/g')
 
           # Prepare caption
-          CAPTION="*Android Build Completed*\n\n\
-          *Version:* v$VERSION_NAME `$VERSION_CODE`\n\
-          *Commit:* \`$COMMIT_HASH\`\n\
-          *Message:* _$ESCAPED_COMMIT_MESSAGE_\n\
-          *Author:* $COMMIT_AUTHOR\n\
-          \n✅ *Status:* Successful\n📦 *Artifact:* app-release.apk"
+          CAPTION="*Android Build Completed*\n\n*Version:* *v$VERSION_NAME* \`($VERSION_CODE)\`\n*Commit:* \`$COMMIT_HASH\`\n*Message:* $ESCAPED_COMMIT_MESSAGE\n*Author:* *$COMMIT_AUTHOR*\n\n✅ *Status:* Successful\n📦 *Artifact:* app-release.apk"
 
-          # Send function
+          # Define send_file function
           send_file() {
-            FILE=$1
+            local FILE="$1"
             if [ -f "$FILE" ]; then
               curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
                 -F chat_id="${TELEGRAM_CHAT_ID}" \
@@ -89,9 +84,15 @@ jobs:
                 -F caption="$CAPTION"
               echo "✅ Sent: $FILE"
             else
-              echo "⚠️ File not found: $FILE"
+              echo "⚠️ File not found, skipping: $FILE"
             fi
           }
 
-          send_file "app/build/outputs/apk/release/app-release.apk"
-          send_file "build/reports/problems/problems-report.html"
+          # Check if APK exists and send
+          if [ -f "app/build/outputs/apk/release/app-release.apk" ]; then
+            send_file "app/build/outputs/apk/release/app-release.apk"
+            send_file "build/reports/problems/problems-report.html"
+          else
+            echo "❌ APK not found. Skipping Telegram notification."
+            exit 1
+          fi
