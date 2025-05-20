@@ -68,14 +68,10 @@ jobs:
           COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
 
           # Escape message for Telegram Markdown
-          ESCAPED_COMMIT_MESSAGE=$(echo "$COMMIT_MESSAGE" | sed 's/[][_*`]/\\\1/g')
+          ESCAPED_COMMIT_MESSAGE=$(echo "$COMMIT_MESSAGE" | sed 's/[\`_*[]/\\&/g')
 
           # Prepare caption
-          CAPTION="*APK Build Info*
-*Version:* v$VERSION_NAME ($VERSION_CODE)
-*Commit:* \`$COMMIT_HASH\`
-*Message:* $ESCAPED_COMMIT_MESSAGE
-*Author:* $COMMIT_AUTHOR"
+          CAPTION="*APK Build Info*\n*Version:* v$VERSION_NAME ($VERSION_CODE)\n*Commit:* \`$COMMIT_HASH\`\n*Message:* $ESCAPED_COMMIT_MESSAGE\n*Author:* $COMMIT_AUTHOR"
 
           # Send function
           send_file() {
