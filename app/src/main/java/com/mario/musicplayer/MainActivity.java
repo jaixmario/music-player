@@ -5,9 +5,11 @@ import android.content.*;
 import android.graphics.*;
 import android.media.*;
 import android.os.*;
+import android.view.View;
 import android.view.animation.*;
 import android.widget.*;
 import android.content.pm.PackageManager;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -15,8 +17,9 @@ import androidx.palette.graphics.Palette;
 
 import com.google.android.material.imageview.ShapeableImageView;
 
-import java.io.*;
-import java.util.*;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -26,6 +29,12 @@ public class MainActivity extends AppCompatActivity {
     private ImageView blurGlow;
     private TextView titleText, artistText, currentTimeText, durationText;
     private SeekBar seekBar;
+
+    private LinearLayout fullPlayerLayout, miniPlayer;
+    private ImageView miniAlbumArt;
+    private TextView miniTitle, miniArtist;
+    private ImageButton miniPlayPause;
+
     private ArrayList<File> songList;
     private int currentSongIndex = -1;
     private final int REQUEST_PERMISSION = 1001;
@@ -41,16 +50,16 @@ public class MainActivity extends AppCompatActivity {
 
             if ("paused".equals(status)) {
                 playPauseButton.setImageResource(android.R.drawable.ic_media_play);
+                miniPlayPause.setImageResource(android.R.drawable.ic_media_play);
                 albumArt.clearAnimation();
             } else if ("resumed".equals(status) || "started".equals(status)) {
                 playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
+                miniPlayPause.setImageResource(android.R.drawable.ic_media_pause);
                 albumArt.startAnimation(rotateAnim);
                 startSeekBarUpdate();
             } else if ("next".equals(status) && path != null) {
                 extractMetadata(path);
-                playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
-                albumArt.startAnimation(rotateAnim);
-                startSeekBarUpdate();
+                updateMiniPlayerUI();
             }
         }
     };
@@ -61,6 +70,14 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         prefs = getSharedPreferences("music_player_prefs", MODE_PRIVATE);
+
+        fullPlayerLayout = findViewById(R.id.fullPlayerLayout);
+        miniPlayer = findViewById(R.id.miniPlayer);
+        miniAlbumArt = findViewById(R.id.miniAlbumArt);
+        miniTitle = findViewById(R.id.miniTitle);
+        miniArtist = findViewById(R.id.miniArtist);
+        miniPlayPause = findViewById(R.id.miniPlayPause);
+
         listView = findViewById(R.id.listView);
         playPauseButton = findViewById(R.id.playPauseButton);
         nextButton = findViewById(R.id.nextButton);
@@ -77,6 +94,8 @@ public class MainActivity extends AppCompatActivity {
         playPauseButton.setOnClickListener(v -> togglePlayPause());
         nextButton.setOnClickListener(v -> playNext());
         prevButton.setOnClickListener(v -> playPrevious());
+        miniPlayPause.setOnClickListener(v -> togglePlayPause());
+        miniPlayer.setOnClickListener(v -> showFullPlayer());
 
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
@@ -89,6 +108,9 @@ public class MainActivity extends AppCompatActivity {
             public void onStartTrackingTouch(SeekBar sb) {}
             public void onStopTrackingTouch(SeekBar sb) {}
         });
+
+        miniPlayer.setVisibility(View.GONE);
+        fullPlayerLayout.setVisibility(View.GONE);
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -109,19 +131,9 @@ public class MainActivity extends AppCompatActivity {
 
         if (currentPath != null && player != null && player.isPlaying()) {
             extractMetadata(currentPath);
-            playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
-            albumArt.startAnimation(rotateAnim);
-            startSeekBarUpdate();
-        } else {
-            int index = prefs.getInt("last_index", -1);
-            if (index != -1 && songList != null && index < songList.size()) {
-                currentSongIndex = index;
-                extractMetadata(songList.get(index).getAbsolutePath());
-                playPauseButton.setImageResource(android.R.drawable.ic_media_play);
-                albumArt.clearAnimation();
-                seekBar.setProgress(0);
-                currentTimeText.setText("0:00");
-            }
+            updateMiniPlayerUI();
+            miniPlayer.setVisibility(View.VISIBLE);
+            miniPlayPause.setImageResource(android.R.drawable.ic_media_pause);
         }
     }
 
@@ -129,6 +141,15 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         unregisterReceiver(updateReceiver);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (fullPlayerLayout.getVisibility() == View.VISIBLE) {
+            fullPlayerLayout.setVisibility(View.GONE);
+        } else {
+            super.onBackPressed();
+        }
     }
 
     private void togglePlayPause() {
@@ -157,12 +178,6 @@ public class MainActivity extends AppCompatActivity {
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, names);
         listView.setAdapter(adapter);
 
-        int lastIndex = prefs.getInt("last_index", -1);
-        if (lastIndex >= 0 && lastIndex < songList.size()) {
-            currentSongIndex = lastIndex;
-            extractMetadata(songList.get(currentSongIndex).getAbsolutePath());
-        }
-
         listView.setOnItemClickListener((parent, view, pos, id) -> {
             currentSongIndex = pos;
             playCurrentSong();
@@ -180,8 +195,13 @@ public class MainActivity extends AppCompatActivity {
         startService(intent);
 
         playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
+        miniPlayPause.setImageResource(android.R.drawable.ic_media_pause);
         albumArt.startAnimation(rotateAnim);
         startSeekBarUpdate();
+
+        updateMiniPlayerUI();
+        miniPlayer.setVisibility(View.VISIBLE);
+        showFullPlayer();
     }
 
     private void playNext() {
@@ -246,6 +266,28 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void updateMiniPlayerUI() {
+        File song = songList.get(currentSongIndex);
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        retriever.setDataSource(song.getAbsolutePath());
+
+        String title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
+        String artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
+        byte[] art = retriever.getEmbeddedPicture();
+
+        miniTitle.setText(title != null ? title : "Unknown Title");
+        miniArtist.setText(artist != null ? artist : "Unknown Artist");
+
+        if (art != null) {
+            Bitmap bitmap = BitmapFactory.decodeByteArray(art, 0, art.length);
+            miniAlbumArt.setImageBitmap(bitmap);
+        } else {
+            miniAlbumArt.setImageResource(android.R.drawable.ic_media_play);
+        }
+
+        retriever.release();
+    }
+
     private void applyDynamicBlur(Bitmap albumBitmap) {
         if (albumBitmap == null) return;
 
@@ -288,5 +330,9 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         return songs;
+    }
+
+    private void showFullPlayer() {
+        fullPlayerLayout.setVisibility(View.VISIBLE);
     }
 }
