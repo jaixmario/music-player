@@ -27,7 +27,7 @@ public class MainActivity extends AppCompatActivity {
     private ShapeableImageView albumArt;
     private ImageView blurGlow;
     private TextView titleText, artistText, currentTimeText, durationText;
-    private SeekBar seekBar;
+    private SeekBar seekBar, miniSeekBar;
 
     private LinearLayout fullPlayerLayout, miniPlayer;
     private ImageView miniAlbumArt;
@@ -59,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
                 startSeekBarUpdate();
 
             } else if ("next".equals(status) && path != null) {
-                currentSongIndex = findIndexByPath(path); // fix: update index
+                currentSongIndex = findIndexByPath(path);
                 extractMetadata(path);
                 updateMiniPlayerUI();
 
@@ -85,6 +85,7 @@ public class MainActivity extends AppCompatActivity {
         miniTitle = findViewById(R.id.miniTitle);
         miniArtist = findViewById(R.id.miniArtist);
         miniPlayPause = findViewById(R.id.miniPlayPause);
+        miniSeekBar = findViewById(R.id.miniSeekBar);
 
         listView = findViewById(R.id.listView);
         playPauseButton = findViewById(R.id.playPauseButton);
@@ -98,6 +99,22 @@ public class MainActivity extends AppCompatActivity {
         durationText = findViewById(R.id.totalTime);
         seekBar = findViewById(R.id.seekBar);
         rotateAnim = AnimationUtils.loadAnimation(this, R.anim.rotate_album);
+
+        miniSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    MediaPlayer player = MusicService.getMediaPlayer();
+                    if (player != null) {
+                        int duration = player.getDuration();
+                        int newPos = (duration * progress) / 100;
+                        player.seekTo(newPos);
+                    }
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
 
         playPauseButton.setOnClickListener(v -> togglePlayPause());
         nextButton.setOnClickListener(v -> playNext());
@@ -134,10 +151,7 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
 
-        if (songList == null || songList.isEmpty()) {
-            loadSongs();
-        }
-
+        if (songList == null || songList.isEmpty()) loadSongs();
         currentSongIndex = prefs.getInt("last_index", -1);
         boolean wasFullPlayerVisible = prefs.getBoolean("is_full_player_visible", false);
 
@@ -158,6 +172,9 @@ public class MainActivity extends AppCompatActivity {
             seekBar.setProgress(currentPos);
             currentTimeText.setText(millisecondsToTimer(currentPos));
 
+            int progress = (int)((currentPos / (float) duration) * 100);
+            miniSeekBar.setProgress(progress);
+
             playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
             miniPlayPause.setImageResource(android.R.drawable.ic_media_pause);
 
@@ -176,6 +193,7 @@ public class MainActivity extends AppCompatActivity {
             miniPlayer.setVisibility(View.GONE);
             fullPlayerLayout.setVisibility(View.GONE);
             seekBar.setProgress(0);
+            miniSeekBar.setProgress(0);
             currentTimeText.setText("0:00");
             durationText.setText("0:00");
             playPauseButton.setImageResource(android.R.drawable.ic_media_play);
@@ -272,6 +290,11 @@ public class MainActivity extends AppCompatActivity {
                 if (player != null && player.isPlaying()) {
                     int currentPos = player.getCurrentPosition();
                     seekBar.setProgress(currentPos);
+
+                    int duration = player.getDuration();
+                    int progress = (int)((currentPos / (float) duration) * 100);
+                    miniSeekBar.setProgress(progress);
+
                     currentTimeText.setText(millisecondsToTimer(currentPos));
                 }
                 handler.postDelayed(this, 500);

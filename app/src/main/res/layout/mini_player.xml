@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Mini Player Layout -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/miniPlayer"
     android:layout_width="match_parent"
-    android:layout_height="64dp"
+    android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
     android:padding="8dp"
@@ -23,6 +22,17 @@
         android:layout_weight="1"
         android:layout_width="0dp"
         android:layout_height="wrap_content">
+
+        <!-- SeekBar Added -->
+        <SeekBar
+            android:id="@+id/miniSeekBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="0"
+            android:thumbTint="#FFFFFF"
+            android:progressTint="#FFFFFF"
+            android:layout_marginBottom="4dp"/>
 
         <TextView
             android:id="@+id/miniTitle"
