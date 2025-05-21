@@ -23,16 +23,15 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content">
 
-        <!-- SeekBar Added -->
         <SeekBar
-        android:id="@+id/miniSeekBar"
-        android:layout_width="match_parent"
-        android:layout_height="2dp"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="4dp"
-        android:thumb="@null"
-        android:progressDrawable="@drawable/mini_seekbar_progress"
-        android:layout_gravity="bottom"/>
+            android:id="@+id/miniSeekBar"
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp"
+            android:thumb="@null"
+            android:progressDrawable="@drawable/mini_seekbar_progress"
+            android:layout_gravity="bottom" />
 
         <TextView
             android:id="@+id/miniTitle"
