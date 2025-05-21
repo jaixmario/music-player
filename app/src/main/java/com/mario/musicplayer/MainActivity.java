@@ -76,7 +76,6 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         Thread.setDefaultUncaughtExceptionHandler(new CrashLogger(this));
         setContentView(R.layout.activity_main);
-        
 
         prefs = getSharedPreferences("music_player_prefs", MODE_PRIVATE);
 
@@ -132,50 +131,57 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onResume() {
-    super.onResume();
-    registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
+        super.onResume();
+        registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
 
-    if (songList == null || songList.isEmpty()) {
-        loadSongs();
-    }
+        if (songList == null || songList.isEmpty()) {
+            loadSongs();
+        }
 
-    currentSongIndex = prefs.getInt("last_index", -1);
+        currentSongIndex = prefs.getInt("last_index", -1);
+        boolean wasFullPlayerVisible = prefs.getBoolean("is_full_player_visible", false);
 
-    MediaPlayer player = MusicService.getMediaPlayer();
-    String currentPath = MusicService.getCurrentPath();
+        MediaPlayer player = MusicService.getMediaPlayer();
+        String currentPath = MusicService.getCurrentPath();
 
-    if (player != null && player.isPlaying() && currentPath != null
-            && currentSongIndex >= 0 && currentSongIndex < songList.size()) {
+        if (player != null && player.isPlaying() && currentPath != null
+                && currentSongIndex >= 0 && currentSongIndex < songList.size()) {
 
-        extractMetadata(currentPath);
-        updateMiniPlayerUI();
+            extractMetadata(currentPath);
+            updateMiniPlayerUI();
 
-        int duration = player.getDuration();
-        seekBar.setMax(duration);
-        durationText.setText(millisecondsToTimer(duration));
+            int duration = player.getDuration();
+            seekBar.setMax(duration);
+            durationText.setText(millisecondsToTimer(duration));
 
-        int currentPos = player.getCurrentPosition();
-        seekBar.setProgress(currentPos);
-        currentTimeText.setText(millisecondsToTimer(currentPos));
+            int currentPos = player.getCurrentPosition();
+            seekBar.setProgress(currentPos);
+            currentTimeText.setText(millisecondsToTimer(currentPos));
 
-        playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
-        miniPlayPause.setImageResource(android.R.drawable.ic_media_pause);
+            playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
+            miniPlayPause.setImageResource(android.R.drawable.ic_media_pause);
 
-        albumArt.startAnimation(rotateAnim);
-        startSeekBarUpdate();
-        miniPlayer.setVisibility(View.VISIBLE);
+            albumArt.startAnimation(rotateAnim);
+            startSeekBarUpdate();
 
-    } else {
-        // Safely hide UI if service/media player is not available
-        miniPlayer.setVisibility(View.GONE);
-        fullPlayerLayout.setVisibility(View.GONE);
-        seekBar.setProgress(0);
-        currentTimeText.setText("0:00");
-        durationText.setText("0:00");
-        playPauseButton.setImageResource(android.R.drawable.ic_media_play);
-        miniPlayPause.setImageResource(android.R.drawable.ic_media_play);
-        albumArt.clearAnimation();
-    }
+            if (wasFullPlayerVisible) {
+                fullPlayerLayout.setVisibility(View.VISIBLE);
+                miniPlayer.setVisibility(View.GONE);
+            } else {
+                fullPlayerLayout.setVisibility(View.GONE);
+                miniPlayer.setVisibility(View.VISIBLE);
+            }
+
+        } else {
+            miniPlayer.setVisibility(View.GONE);
+            fullPlayerLayout.setVisibility(View.GONE);
+            seekBar.setProgress(0);
+            currentTimeText.setText("0:00");
+            durationText.setText("0:00");
+            playPauseButton.setImageResource(android.R.drawable.ic_media_play);
+            miniPlayPause.setImageResource(android.R.drawable.ic_media_play);
+            albumArt.clearAnimation();
+        }
     }
 
     @Override
@@ -189,6 +195,7 @@ public class MainActivity extends AppCompatActivity {
         if (fullPlayerLayout.getVisibility() == View.VISIBLE) {
             fullPlayerLayout.setVisibility(View.GONE);
             miniPlayer.setVisibility(View.VISIBLE);
+            prefs.edit().putBoolean("is_full_player_visible", false).apply();
         } else {
             super.onBackPressed();
         }
@@ -383,6 +390,7 @@ public class MainActivity extends AppCompatActivity {
     private void showFullPlayer() {
         fullPlayerLayout.setVisibility(View.VISIBLE);
         miniPlayer.setVisibility(View.GONE);
+        prefs.edit().putBoolean("is_full_player_visible", true).apply();
     }
 
     private int findIndexByPath(String path) {
