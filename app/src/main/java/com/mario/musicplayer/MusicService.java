@@ -49,47 +49,54 @@ public class MusicService extends Service {
     }
 
     @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        String action = intent.getAction();
-        if (ACTION_START.equals(action)) {
-            String path = intent.getStringExtra("song_path");
-            if (path != null) {
-                currentIndex = findIndexByPath(path);
-                prefs.edit().putInt("last_index", currentIndex).apply();
-                extractMetadata(path);
-                startMediaPlayer(path);
-                sendBroadcastUpdate("started", path);
-            }
+public int onStartCommand(Intent intent, int flags, int startId) {
+    if (intent == null || intent.getAction() == null) {
+        stopSelf();  // Or just log and ignore
+        return START_NOT_STICKY;
+    }
 
-        } else if (ACTION_PAUSE.equals(action)) {
-            if (mediaPlayer != null && mediaPlayer.isPlaying()) {
-                mediaPlayer.pause();
-                stopForeground(true);
-                sendBroadcastUpdate("paused", null);
-            }
+    String action = intent.getAction();
 
-        } else if (ACTION_RESUME.equals(action)) {
-            if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
-                mediaPlayer.start();
-                startForeground(1, createNotification());
-                sendBroadcastUpdate("resumed", null);
-            }
-
-        } else if (ACTION_STOP.equals(action)) {
-            stopForeground(true);
-            stopSelf();
-
-        } else if (ACTION_NEXT.equals(action)) {
-            currentIndex = (currentIndex + 1) % songList.size();
-            playSongAt(currentIndex);
-
-        } else if (ACTION_PREV.equals(action)) {
-            currentIndex = (currentIndex - 1 + songList.size()) % songList.size();
-            playSongAt(currentIndex);
+    if (ACTION_START.equals(action)) {
+        String path = intent.getStringExtra("song_path");
+        if (path != null) {
+            currentIndex = findIndexByPath(path);
+            prefs.edit().putInt("last_index", currentIndex).apply();
+            extractMetadata(path);
+            startMediaPlayer(path);
+            sendBroadcastUpdate("started", path);
         }
 
-        return START_STICKY;
+    } else if (ACTION_PAUSE.equals(action)) {
+        if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+            mediaPlayer.pause();
+            stopForeground(true);
+            sendBroadcastUpdate("paused", null);
+        }
+
+    } else if (ACTION_RESUME.equals(action)) {
+        if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
+            mediaPlayer.start();
+            startForeground(1, createNotification());
+            sendBroadcastUpdate("resumed", null);
+        }
+
+    } else if (ACTION_STOP.equals(action)) {
+        stopForeground(true);
+        stopSelf();
+
+    } else if (ACTION_NEXT.equals(action)) {
+        currentIndex = (currentIndex + 1) % songList.size();
+        playSongAt(currentIndex);
+
+    } else if (ACTION_PREV.equals(action)) {
+        currentIndex = (currentIndex - 1 + songList.size()) % songList.size();
+        playSongAt(currentIndex);
     }
+
+    return START_STICKY;
+    }
+    
 
     private void startMediaPlayer(String path) {
         try {
