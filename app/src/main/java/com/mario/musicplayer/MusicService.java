@@ -10,6 +10,8 @@ import androidx.core.app.NotificationCompat;
 import java.io.*;
 import java.util.*;
 
+import android.database.Cursor;
+
 public class MusicService extends Service {
 
     public static final String ACTION_START = "START";
@@ -26,6 +28,8 @@ public class MusicService extends Service {
     private ArrayList<File> songList = new ArrayList<>();
     public int currentIndex = -1;
     private SharedPreferences prefs;
+
+    private DatabaseHelper db;
 
     public static MediaPlayer getMediaPlayer() {
         return instance != null ? instance.mediaPlayer : null;
@@ -44,59 +48,59 @@ public class MusicService extends Service {
     public void onCreate() {
         super.onCreate();
         instance = this;
+        db = new DatabaseHelper(this);
         prefs = getSharedPreferences("music_player_prefs", MODE_PRIVATE);
         loadSongs();
     }
 
     @Override
-public int onStartCommand(Intent intent, int flags, int startId) {
-    if (intent == null || intent.getAction() == null) {
-        stopSelf();  // Or just log and ignore
-        return START_NOT_STICKY;
-    }
-
-    String action = intent.getAction();
-
-    if (ACTION_START.equals(action)) {
-        String path = intent.getStringExtra("song_path");
-        if (path != null) {
-            currentIndex = findIndexByPath(path);
-            prefs.edit().putInt("last_index", currentIndex).apply();
-            extractMetadata(path);
-            startMediaPlayer(path);
-            sendBroadcastUpdate("started", path);
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent == null || intent.getAction() == null) {
+            stopSelf();  // Or just log and ignore
+            return START_NOT_STICKY;
         }
 
-    } else if (ACTION_PAUSE.equals(action)) {
-        if (mediaPlayer != null && mediaPlayer.isPlaying()) {
-            mediaPlayer.pause();
+        String action = intent.getAction();
+
+        if (ACTION_START.equals(action)) {
+            String path = intent.getStringExtra("song_path");
+            if (path != null) {
+                currentIndex = findIndexByPath(path);
+                prefs.edit().putInt("last_index", currentIndex).apply();
+                extractMetadata(path);
+                startMediaPlayer(path);
+                sendBroadcastUpdate("started", path);
+            }
+
+        } else if (ACTION_PAUSE.equals(action)) {
+            if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+                mediaPlayer.pause();
+                stopForeground(true);
+                sendBroadcastUpdate("paused", null);
+            }
+
+        } else if (ACTION_RESUME.equals(action)) {
+            if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
+                mediaPlayer.start();
+                startForeground(1, createNotification());
+                sendBroadcastUpdate("resumed", null);
+            }
+
+        } else if (ACTION_STOP.equals(action)) {
             stopForeground(true);
-            sendBroadcastUpdate("paused", null);
+            stopSelf();
+
+        } else if (ACTION_NEXT.equals(action)) {
+            currentIndex = (currentIndex + 1) % songList.size();
+            playSongAt(currentIndex);
+
+        } else if (ACTION_PREV.equals(action)) {
+            currentIndex = (currentIndex - 1 + songList.size()) % songList.size();
+            playSongAt(currentIndex);
         }
 
-    } else if (ACTION_RESUME.equals(action)) {
-        if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
-            mediaPlayer.start();
-            startForeground(1, createNotification());
-            sendBroadcastUpdate("resumed", null);
-        }
-
-    } else if (ACTION_STOP.equals(action)) {
-        stopForeground(true);
-        stopSelf();
-
-    } else if (ACTION_NEXT.equals(action)) {
-        currentIndex = (currentIndex + 1) % songList.size();
-        playSongAt(currentIndex);
-
-    } else if (ACTION_PREV.equals(action)) {
-        currentIndex = (currentIndex - 1 + songList.size()) % songList.size();
-        playSongAt(currentIndex);
+        return START_STICKY;
     }
-
-    return START_STICKY;
-    }
-    
 
     private void startMediaPlayer(String path) {
         try {
@@ -140,21 +144,18 @@ public int onStartCommand(Intent intent, int flags, int startId) {
     }
 
     private void extractMetadata(String path) {
-        try {
-            MediaMetadataRetriever retriever = new MediaMetadataRetriever();
-            retriever.setDataSource(path);
-            String title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
-            String artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
-            currentTitle = title != null ? title : "Unknown Title";
-            currentArtist = artist != null ? artist : "Unknown Artist";
-            retriever.release();
-        } catch (Exception e) {
+        Cursor cursor = db.getSong(path);
+        if (cursor.moveToFirst()) {
+            currentTitle = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_TITLE));
+            currentArtist = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_ARTIST));
+        } else {
             currentTitle = "Unknown Title";
             currentArtist = "Unknown Artist";
         }
+        cursor.close();
     }
 
-    private void sendBroadcastUpdate(String status, String path) {
+    private void sendBroadcastUpdate(String status, @Nullable String path) {
         Intent intent = new Intent("UPDATE_UI");
         intent.putExtra("status", status);
         if (path != null) intent.putExtra("song_path", path);
@@ -216,7 +217,7 @@ public int onStartCommand(Intent intent, int flags, int startId) {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        sendBroadcastUpdate("stopped", null);  // let UI hide player
+        sendBroadcastUpdate("stopped", null);
         if (mediaPlayer != null) {
             mediaPlayer.release();
             mediaPlayer = null;
