@@ -237,17 +237,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void loadSongs() {
-        File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
-        songList = findSongs(musicDir);
-        ArrayList<String> names = new ArrayList<>();
-        for (File f : songList) names.add(f.getName());
+    File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
+    songList = findSongs(musicDir);
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, names);
-        listView.setAdapter(adapter);
+    // Use custom SongAdapter
+    SongAdapter adapter = new SongAdapter(this, songList);
+    listView.setAdapter(adapter);
 
-        listView.setOnItemClickListener((parent, view, pos, id) -> {
-            currentSongIndex = pos;
-            playCurrentSong();
+    listView.setOnItemClickListener((parent, view, pos, id) -> {
+        currentSongIndex = pos;
+        playCurrentSong();
         });
     }
 
