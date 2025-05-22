@@ -19,6 +19,7 @@ import androidx.palette.graphics.Palette;
 import com.google.android.material.imageview.ShapeableImageView;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -110,6 +111,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             }
+
             public void onStartTrackingTouch(SeekBar sb) {}
             public void onStopTrackingTouch(SeekBar sb) {}
         });
@@ -127,6 +129,7 @@ public class MainActivity extends AppCompatActivity {
                     if (player != null) player.seekTo(progress);
                 }
             }
+
             public void onStartTrackingTouch(SeekBar sb) {}
             public void onStopTrackingTouch(SeekBar sb) {}
         });
@@ -193,7 +196,12 @@ public class MainActivity extends AppCompatActivity {
                 songImage.setImageResource(android.R.drawable.ic_media_play);
             }
 
-            retriever.release();
+            try {
+                retriever.release();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
             return convertView;
         }
     }
@@ -296,7 +304,7 @@ public class MainActivity extends AppCompatActivity {
         } finally {
             try {
                 retriever.release();
-            } catch (Exception e) {
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
@@ -323,7 +331,11 @@ public class MainActivity extends AppCompatActivity {
             miniAlbumArt.setImageResource(android.R.drawable.ic_media_play);
         }
 
-        retriever.release();
+        try {
+            retriever.release();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void applyDynamicBlur(Bitmap albumBitmap) {
