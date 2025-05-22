@@ -19,6 +19,7 @@ import androidx.palette.graphics.Palette;
 import com.google.android.material.imageview.ShapeableImageView;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
@@ -169,7 +170,11 @@ public class MainActivity extends AppCompatActivity {
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {
-                    retriever.release();
+                    try {
+                        retriever.release();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
         }
