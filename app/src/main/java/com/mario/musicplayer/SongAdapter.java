@@ -77,7 +77,11 @@ public class SongAdapter extends BaseAdapter {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            retriever.release();
+            try {
+                retriever.release();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
         return convertView;
