@@ -1,9 +1,9 @@
 package com.mario.musicplayer;
 
 import android.content.Context;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.media.MediaMetadataRetriever;
 import android.view.*;
 import android.widget.*;
 
@@ -14,11 +14,13 @@ public class SongAdapter extends BaseAdapter {
     private Context context;
     private ArrayList<File> songs;
     private LayoutInflater inflater;
+    private DatabaseHelper db;
 
     public SongAdapter(Context context, ArrayList<File> songs) {
         this.context = context;
         this.songs = songs;
         inflater = LayoutInflater.from(context);
+        db = new DatabaseHelper(context);
     }
 
     @Override
@@ -58,12 +60,11 @@ public class SongAdapter extends BaseAdapter {
             holder = (ViewHolder) convertView.getTag();
         }
 
-        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
-        try {
-            retriever.setDataSource(song.getAbsolutePath());
-            String title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
-            String artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
-            byte[] art = retriever.getEmbeddedPicture();
+        Cursor cursor = db.getSong(song.getAbsolutePath());
+        if (cursor.moveToFirst()) {
+            String title = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_TITLE));
+            String artist = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_ARTIST));
+            byte[] art = cursor.getBlob(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_ART));
 
             holder.songTitle.setText(title != null ? title : "Unknown Title");
             holder.songArtist.setText(artist != null ? artist : "Unknown Artist");
@@ -74,16 +75,14 @@ public class SongAdapter extends BaseAdapter {
             } else {
                 holder.songImage.setImageResource(android.R.drawable.ic_media_play);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                retriever.release();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+        } else {
+            // fallback if not found
+            holder.songTitle.setText(song.getName());
+            holder.songArtist.setText("Unknown Artist");
+            holder.songImage.setImageResource(android.R.drawable.ic_media_play);
         }
 
+        cursor.close();
         return convertView;
     }
 }
