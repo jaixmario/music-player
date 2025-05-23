@@ -452,12 +452,9 @@ protected void onCreate(Bundle savedInstanceState) {
         fullPlayerLayout.setVisibility(View.GONE);
         miniPlayer.setVisibility(View.VISIBLE);
         prefs.edit().putBoolean("is_full_player_visible", false).apply();
-    } else if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
-        getSupportFragmentManager().popBackStack();
-        findViewById(R.id.fragment_container).setVisibility(View.GONE);
-        findViewById(R.id.mainContentArea).setVisibility(View.VISIBLE);
+    } else if (getSupportFragmentManager().findFragmentById(R.id.fragment_container) instanceof SettingsFragment) {
+        // Do nothing — block back press on settings
     } else {
         super.onBackPressed();
     }
     }
-}
