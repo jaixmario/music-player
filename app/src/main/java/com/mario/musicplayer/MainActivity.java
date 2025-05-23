@@ -145,14 +145,15 @@ protected void onCreate(Bundle savedInstanceState) {
         loadSongs();
     }
 
-    // Bottom NavigationView setup using if-else
-    BottomNavigationView navView = findViewById(R.id.bottomNavigationView);
-    navView.setOnItemSelectedListener(item -> {
+   // Bottom NavigationView setup using if-else
+   BottomNavigationView navView = findViewById(R.id.bottomNavigationView);
+   navView.setOnItemSelectedListener(item -> {
     int id = item.getItemId();
     if (id == R.id.nav_home) {
         findViewById(R.id.fragment_container).setVisibility(View.GONE);
         findViewById(R.id.mainContentArea).setVisibility(View.VISIBLE);
         return true;
+    }
     } else if (id == R.id.nav_download) {
         Toast.makeText(this, "Download feature coming soon!", Toast.LENGTH_SHORT).show();
         return true;
