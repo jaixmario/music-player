@@ -156,7 +156,7 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Download feature coming soon!", Toast.LENGTH_SHORT).show();
             return true;
         } else if (id == R.id.nav_settings) {
-            Toast.makeText(this, "Settings feature coming soon!", Toast.LENGTH_SHORT).show();
+            startActivity(new Intent(this, SettingsActivity.class));
             return true;
         }
         return false;
