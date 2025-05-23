@@ -157,7 +157,7 @@ protected void onCreate(Bundle savedInstanceState) {
             return true;
         } else if (id == R.id.nav_settings) {
             findViewById(R.id.mainContentArea).setVisibility(View.GONE);
-            findViewById(R.id.fragment_container).setVisibility(View.VISIBL0E);
+            findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
             getSupportFragmentManager().beginTransaction()
             .replace(R.id.fragment_container, new SettingsFragment())
             .addToBackStack(null)
