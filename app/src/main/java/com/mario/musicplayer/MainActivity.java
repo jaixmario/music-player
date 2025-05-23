@@ -447,15 +447,17 @@ protected void onCreate(Bundle savedInstanceState) {
     }
 
     @Override
-    public void onBackPressed() {
+public void onBackPressed() {
     if (fullPlayerLayout.getVisibility() == View.VISIBLE) {
         fullPlayerLayout.setVisibility(View.GONE);
         miniPlayer.setVisibility(View.VISIBLE);
         prefs.edit().putBoolean("is_full_player_visible", false).apply();
     } else if (getSupportFragmentManager().findFragmentById(R.id.fragment_container) instanceof SettingsFragment) {
-        // Block back press on settings screen
+        // Block back press on settings
         return;
     } else {
         super.onBackPressed();
     }
+} 
+
 }
