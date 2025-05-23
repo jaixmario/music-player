@@ -169,7 +169,7 @@ protected void onCreate(Bundle savedInstanceState) {
 
         return false;
         });
-        
+       }
     private void loadSongs() {
         File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
         songList = findSongs(musicDir);
@@ -453,8 +453,9 @@ protected void onCreate(Bundle savedInstanceState) {
         miniPlayer.setVisibility(View.VISIBLE);
         prefs.edit().putBoolean("is_full_player_visible", false).apply();
     } else if (getSupportFragmentManager().findFragmentById(R.id.fragment_container) instanceof SettingsFragment) {
-        // Do nothing — block back press on settings
+        // Block back press on settings screen
+        return;
     } else {
         super.onBackPressed();
     }
-    }
+}
