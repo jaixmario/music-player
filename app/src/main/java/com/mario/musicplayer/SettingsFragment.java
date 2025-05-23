@@ -33,23 +33,20 @@ public class SettingsFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         Button btnExportDb = view.findViewById(R.id.btnExportDb);
         BottomNavigationView navView = view.findViewById(R.id.bottomNavigationView);
-
         navView.setSelectedItemId(R.id.nav_settings);
-
-        btnExportDb.setOnClickListener(v -> exportDatabase());
-
+        
         navView.setOnItemSelectedListener(item -> {
-            if (item.getItemId() == R.id.nav_home) {
-                requireActivity().getSupportFragmentManager().popBackStack();
-                return true;
-            } else if (item.getItemId() == R.id.nav_download) {
-                Toast.makeText(requireContext(), "Download feature coming soon!", Toast.LENGTH_SHORT).show();
-                return true;
-            } else if (item.getItemId() == R.id.nav_settings) {
-                return true;
-            }
-            return false;
-        });
+        if (item.getItemId() == R.id.nav_home) {
+        requireActivity().getSupportFragmentManager().popBackStack();
+        return true;
+        } else if (item.getItemId() == R.id.nav_download) {
+        Toast.makeText(requireContext(), "Download feature coming soon!", Toast.LENGTH_SHORT).show();
+        return true;
+        } else if (item.getItemId() == R.id.nav_settings) {
+        return true;
+        }
+        return false;
+    });
 
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q &&
             ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE)
