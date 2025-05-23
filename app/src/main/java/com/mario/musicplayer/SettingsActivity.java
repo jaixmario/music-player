@@ -1,6 +1,7 @@
 package com.mario.musicplayer;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -11,6 +12,8 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import java.io.*;
 
@@ -26,14 +29,33 @@ public class SettingsActivity extends AppCompatActivity {
         Button btnExportDb = findViewById(R.id.btnExportDb);
 
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                    != PackageManager.PERMISSION_GRANTED) {
+                ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
                     REQUEST_PERMISSION);
         }
 
         btnExportDb.setOnClickListener(v -> exportDatabase());
+
+        // Setup footer navigation
+        BottomNavigationView navView = findViewById(R.id.bottomNavigationView);
+        navView.setSelectedItemId(R.id.nav_settings); // highlight current tab
+
+        navView.setOnItemSelectedListener(item -> {
+            int id = item.getItemId();
+            if (id == R.id.nav_home) {
+                startActivity(new Intent(this, MainActivity.class));
+                finish();
+                return true;
+            } else if (id == R.id.nav_download) {
+                Toast.makeText(this, "Download feature coming soon!", Toast.LENGTH_SHORT).show();
+                return true;
+            } else if (id == R.id.nav_settings) {
+                return true; // already here
+            }
+            return false;
+        });
     }
 
     private void exportDatabase() {
