@@ -145,19 +145,19 @@ public class MainActivity extends AppCompatActivity {
         loadSongs();
     }
 
-    // Footer Navigation setup
+    // Bottom NavigationView setup using if-else
     BottomNavigationView navView = findViewById(R.id.bottomNavigationView);
     navView.setOnItemSelectedListener(item -> {
-        switch (item.getItemId()) {
-            case R.id.nav_home:
-                Toast.makeText(this, "Home", Toast.LENGTH_SHORT).show();
-                return true;
-            case R.id.nav_download:
-                Toast.makeText(this, "Download feature coming soon!", Toast.LENGTH_SHORT).show();
-                return true;
-            case R.id.nav_settings:
-                Toast.makeText(this, "Settings feature coming soon!", Toast.LENGTH_SHORT).show();
-                return true;
+        int id = item.getItemId();
+        if (id == R.id.nav_home) {
+            Toast.makeText(this, "Home", Toast.LENGTH_SHORT).show();
+            return true;
+        } else if (id == R.id.nav_download) {
+            Toast.makeText(this, "Download feature coming soon!", Toast.LENGTH_SHORT).show();
+            return true;
+        } else if (id == R.id.nav_settings) {
+            Toast.makeText(this, "Settings feature coming soon!", Toast.LENGTH_SHORT).show();
+            return true;
         }
         return false;
     });
