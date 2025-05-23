@@ -150,8 +150,10 @@ protected void onCreate(Bundle savedInstanceState) {
     navView.setOnItemSelectedListener(item -> {
         int id = item.getItemId();
         if (id == R.id.nav_home) {
-            Toast.makeText(this, "Home", Toast.LENGTH_SHORT).show();
-            return true;
+    findViewById(R.id.fragment_container).setVisibility(View.GONE);
+    findViewById(R.id.mainContentArea).setVisibility(View.VISIBLE);
+    return true;
+    }
         } else if (id == R.id.nav_download) {
             Toast.makeText(this, "Download feature coming soon!", Toast.LENGTH_SHORT).show();
             return true;
@@ -446,12 +448,16 @@ protected void onCreate(Bundle savedInstanceState) {
 
     @Override
     public void onBackPressed() {
-        if (fullPlayerLayout.getVisibility() == View.VISIBLE) {
-            fullPlayerLayout.setVisibility(View.GONE);
-            miniPlayer.setVisibility(View.VISIBLE);
-            prefs.edit().putBoolean("is_full_player_visible", false).apply();
-        } else {
-            super.onBackPressed();
-        }
+    if (fullPlayerLayout.getVisibility() == View.VISIBLE) {
+        fullPlayerLayout.setVisibility(View.GONE);
+        miniPlayer.setVisibility(View.VISIBLE);
+        prefs.edit().putBoolean("is_full_player_visible", false).apply();
+    } else if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
+        getSupportFragmentManager().popBackStack();
+        findViewById(R.id.fragment_container).setVisibility(View.GONE);
+        findViewById(R.id.mainContentArea).setVisibility(View.VISIBLE);
+    } else {
+        super.onBackPressed();
+    }
     }
 }
