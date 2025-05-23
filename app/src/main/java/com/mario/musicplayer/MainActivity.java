@@ -74,76 +74,93 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        Thread.setDefaultUncaughtExceptionHandler(new CrashLogger(this));
-        setContentView(R.layout.activity_main);
+    super.onCreate(savedInstanceState);
+    Thread.setDefaultUncaughtExceptionHandler(new CrashLogger(this));
+    setContentView(R.layout.activity_main);
 
-        db = new DatabaseHelper(this);
-        prefs = getSharedPreferences("music_player_prefs", MODE_PRIVATE);
+    db = new DatabaseHelper(this);
+    prefs = getSharedPreferences("music_player_prefs", MODE_PRIVATE);
 
-        fullPlayerLayout = findViewById(R.id.fullPlayerLayout);
-        miniPlayer = findViewById(R.id.miniPlayer);
-        miniAlbumArt = findViewById(R.id.miniAlbumArt);
-        miniTitle = findViewById(R.id.miniTitle);
-        miniArtist = findViewById(R.id.miniArtist);
-        miniPlayPause = findViewById(R.id.miniPlayPause);
-        miniSeekBar = findViewById(R.id.miniSeekBar);
+    fullPlayerLayout = findViewById(R.id.fullPlayerLayout);
+    miniPlayer = findViewById(R.id.miniPlayer);
+    miniAlbumArt = findViewById(R.id.miniAlbumArt);
+    miniTitle = findViewById(R.id.miniTitle);
+    miniArtist = findViewById(R.id.miniArtist);
+    miniPlayPause = findViewById(R.id.miniPlayPause);
+    miniSeekBar = findViewById(R.id.miniSeekBar);
 
-        listView = findViewById(R.id.listView);
-        playPauseButton = findViewById(R.id.playPauseButton);
-        nextButton = findViewById(R.id.nextButton);
-        prevButton = findViewById(R.id.prevButton);
-        albumArt = findViewById(R.id.albumArt);
-        blurGlow = findViewById(R.id.blurGlow);
-        titleText = findViewById(R.id.titleText);
-        artistText = findViewById(R.id.artistText);
-        currentTimeText = findViewById(R.id.currentTime);
-        durationText = findViewById(R.id.totalTime);
-        seekBar = findViewById(R.id.seekBar);
-        rotateAnim = AnimationUtils.loadAnimation(this, R.anim.rotate_album);
+    listView = findViewById(R.id.listView);
+    playPauseButton = findViewById(R.id.playPauseButton);
+    nextButton = findViewById(R.id.nextButton);
+    prevButton = findViewById(R.id.prevButton);
+    albumArt = findViewById(R.id.albumArt);
+    blurGlow = findViewById(R.id.blurGlow);
+    titleText = findViewById(R.id.titleText);
+    artistText = findViewById(R.id.artistText);
+    currentTimeText = findViewById(R.id.currentTime);
+    durationText = findViewById(R.id.totalTime);
+    seekBar = findViewById(R.id.seekBar);
+    rotateAnim = AnimationUtils.loadAnimation(this, R.anim.rotate_album);
 
-        miniSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (fromUser) {
-                    MediaPlayer player = MusicService.getMediaPlayer();
-                    if (player != null) {
-                        int duration = player.getDuration();
-                        int newPos = (duration * progress) / 100;
-                        player.seekTo(newPos);
-                    }
+    miniSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+        @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+            if (fromUser) {
+                MediaPlayer player = MusicService.getMediaPlayer();
+                if (player != null) {
+                    int duration = player.getDuration();
+                    int newPos = (duration * progress) / 100;
+                    player.seekTo(newPos);
                 }
             }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
-
-        playPauseButton.setOnClickListener(v -> togglePlayPause());
-        nextButton.setOnClickListener(v -> playNext());
-        prevButton.setOnClickListener(v -> playPrevious());
-        miniPlayPause.setOnClickListener(v -> togglePlayPause());
-        miniPlayer.setOnClickListener(v -> showFullPlayer());
-
-        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
-                if (fromUser) {
-                    MediaPlayer player = MusicService.getMediaPlayer();
-                    if (player != null) player.seekTo(progress);
-                }
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {}
-        });
-
-        miniPlayer.setVisibility(View.GONE);
-        fullPlayerLayout.setVisibility(View.GONE);
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_PERMISSION);
-        } else {
-            loadSongs();
         }
+        @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+        @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+    });
+
+    playPauseButton.setOnClickListener(v -> togglePlayPause());
+    nextButton.setOnClickListener(v -> playNext());
+    prevButton.setOnClickListener(v -> playPrevious());
+    miniPlayPause.setOnClickListener(v -> togglePlayPause());
+    miniPlayer.setOnClickListener(v -> showFullPlayer());
+
+    seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+        public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+            if (fromUser) {
+                MediaPlayer player = MusicService.getMediaPlayer();
+                if (player != null) player.seekTo(progress);
+            }
+        }
+        public void onStartTrackingTouch(SeekBar sb) {}
+        public void onStopTrackingTouch(SeekBar sb) {}
+    });
+
+    miniPlayer.setVisibility(View.GONE);
+    fullPlayerLayout.setVisibility(View.GONE);
+
+    if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
+            != PackageManager.PERMISSION_GRANTED) {
+        ActivityCompat.requestPermissions(this,
+                new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_PERMISSION);
+    } else {
+        loadSongs();
+    }
+
+    // Footer Navigation setup
+    BottomNavigationView navView = findViewById(R.id.bottomNavigationView);
+    navView.setOnItemSelectedListener(item -> {
+        switch (item.getItemId()) {
+            case R.id.nav_home:
+                Toast.makeText(this, "Home", Toast.LENGTH_SHORT).show();
+                return true;
+            case R.id.nav_download:
+                Toast.makeText(this, "Download feature coming soon!", Toast.LENGTH_SHORT).show();
+                return true;
+            case R.id.nav_settings:
+                Toast.makeText(this, "Settings feature coming soon!", Toast.LENGTH_SHORT).show();
+                return true;
+        }
+        return false;
+    });
     }
 
     private void loadSongs() {
