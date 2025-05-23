@@ -156,10 +156,12 @@ protected void onCreate(Bundle savedInstanceState) {
             Toast.makeText(this, "Download feature coming soon!", Toast.LENGTH_SHORT).show();
             return true;
         } else if (id == R.id.nav_settings) {
+            findViewById(R.id.mainContentArea).setVisibility(View.GONE);
+            findViewById(R.id.fragment_container).setVisibility(View.VISIBL0E);
             getSupportFragmentManager().beginTransaction()
-                .replace(R.id.fragment_container, new SettingsFragment())
-                .addToBackStack(null)
-                .commit();
+            .replace(R.id.fragment_container, new SettingsFragment())
+            .addToBackStack(null)
+            .commit();
             return true;
         }
         return false;
