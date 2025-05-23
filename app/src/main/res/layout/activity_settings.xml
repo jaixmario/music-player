@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="24dp"
     android:gravity="center_horizontal"
-    android:background="@android:color/white">
+    android:background="?android:attr/windowBackground">
 
     <TextView
         android:id="@+id/settingsTitle"
@@ -15,14 +16,18 @@
         android:text="Settings"
         android:textSize="20sp"
         android:textStyle="bold"
+        android:textColor="?android:attr/textColorPrimary"
         android:paddingBottom="24dp" />
 
-    <Button
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/btnExportDb"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Export Database to Downloads"
-        android:layout_marginTop="12dp" />
+        android:layout_marginTop="12dp"
+        style="@style/Widget.MaterialComponents.Button"
+        app:cornerRadius="24dp"
+        app:rippleColor="?attr/colorOnPrimary" />
 
     <View
         android:layout_width="match_parent"
