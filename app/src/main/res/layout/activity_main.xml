@@ -5,7 +5,7 @@
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="12dp"
+    android:padding="0dp"
     android:gravity="center_horizontal">
 
     <!-- Full Player Layout -->
@@ -123,27 +123,30 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- ListView for Songs (placed above mini player) -->
-    <ListView
-        android:id="@+id/listView"
+    <!-- Main Content Area (ListView + Mini Player) -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:dividerHeight="1dp" />
+        android:orientation="vertical">
 
-    <!-- Mini Player at the bottom -->
-    <include layout="@layout/mini_player" />
-    
+        <ListView
+            android:id="@+id/listView"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:dividerHeight="1dp" />
+
+        <include layout="@layout/mini_player" />
+    </LinearLayout>
+
     <!-- Footer Navigation -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
-    android:id="@+id/bottomNavigationView"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:background="?android:attr/windowBackground"
-    app:menu="@menu/bottom_nav_menu"
-    android:layout_gravity="bottom"
-    app:labelVisibilityMode="labeled" />
-    
-    
+        android:id="@+id/bottomNavigationView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?android:attr/windowBackground"
+        app:menu="@menu/bottom_nav_menu"
+        app:labelVisibilityMode="labeled" />
 
 </LinearLayout>
