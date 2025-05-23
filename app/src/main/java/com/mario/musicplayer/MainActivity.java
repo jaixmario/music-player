@@ -156,11 +156,11 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Download feature coming soon!", Toast.LENGTH_SHORT).show();
             return true;
         } else if (id == R.id.nav_settings) {
-            startActivity(new Intent(this, SettingsActivity.class));
-            return true;
-        }
-        return false;
-    });
+    getSupportFragmentManager().beginTransaction()
+        .replace(R.id.fragment_container, new SettingsFragment())
+        .addToBackStack(null)
+        .commit();
+    return true;
     }
 
     private void loadSongs() {
