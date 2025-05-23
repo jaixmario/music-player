@@ -148,27 +148,25 @@ protected void onCreate(Bundle savedInstanceState) {
     // Bottom NavigationView setup using if-else
     BottomNavigationView navView = findViewById(R.id.bottomNavigationView);
     navView.setOnItemSelectedListener(item -> {
-        int id = item.getItemId();
-        if (id == R.id.nav_home) {
-    findViewById(R.id.fragment_container).setVisibility(View.GONE);
-    findViewById(R.id.mainContentArea).setVisibility(View.VISIBLE);
-    return true;
-    }
-        } else if (id == R.id.nav_download) {
-            Toast.makeText(this, "Download feature coming soon!", Toast.LENGTH_SHORT).show();
-            return true;
-        } else if (id == R.id.nav_settings) {
-            findViewById(R.id.mainContentArea).setVisibility(View.GONE);
-            findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
-            getSupportFragmentManager().beginTransaction()
+    int id = item.getItemId();
+    if (id == R.id.nav_home) {
+        findViewById(R.id.fragment_container).setVisibility(View.GONE);
+        findViewById(R.id.mainContentArea).setVisibility(View.VISIBLE);
+        return true;
+    } else if (id == R.id.nav_download) {
+        Toast.makeText(this, "Download feature coming soon!", Toast.LENGTH_SHORT).show();
+        return true;
+    } else if (id == R.id.nav_settings) {
+        findViewById(R.id.mainContentArea).setVisibility(View.GONE);
+        findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
+        getSupportFragmentManager().beginTransaction()
             .replace(R.id.fragment_container, new SettingsFragment())
             .addToBackStack(null)
             .commit();
-            return true;
-        }
-        return false;
-    });
+        return true;
     }
+    return false;
+    });
 
     private void loadSongs() {
         File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
