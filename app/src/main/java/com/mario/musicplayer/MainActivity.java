@@ -172,8 +172,18 @@ protected void onCreate(Bundle savedInstanceState) {
         return true;
 
     } else if (id == R.id.nav_download) {
-        Toast.makeText(this, "Download feature coming soon!", Toast.LENGTH_SHORT).show();
-        return true;
+    findViewById(R.id.mainContentArea).setVisibility(View.GONE);
+    fullPlayerLayout.setVisibility(View.GONE);
+    miniPlayer.setVisibility(View.GONE);
+    findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
+
+    getSupportFragmentManager().beginTransaction()
+        .replace(R.id.fragment_container, new DownloadFragment())
+        .addToBackStack(null)
+        .commit();
+
+    return true;
+    }
 
     } else if (id == R.id.nav_settings) {
         findViewById(R.id.mainContentArea).setVisibility(View.GONE);
