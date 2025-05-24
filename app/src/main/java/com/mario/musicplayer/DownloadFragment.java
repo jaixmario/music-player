@@ -62,17 +62,19 @@ public class DownloadFragment extends Fragment {
                 conn.connect();
 
                 if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                    // Save directly to /Music/
                     File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
                     if (!musicDir.exists()) musicDir.mkdirs();
 
-                    // Try to extract filename from header
-                    String fileName = "song_" + System.currentTimeMillis() + ".mp3";
+                    // Try to get original file name
+                    String tempFileName = "song_" + System.currentTimeMillis() + ".mp3";
                     String contentDisp = conn.getHeaderField("Content-Disposition");
                     if (contentDisp != null && contentDisp.contains("filename=")) {
                         int start = contentDisp.indexOf("filename=") + 9;
-                        fileName = contentDisp.substring(start).replace("\"", "").trim();
+                        tempFileName = contentDisp.substring(start).replace("\"", "").trim();
                     }
 
+                    final String fileName = tempFileName;
                     File outFile = new File(musicDir, fileName);
 
                     InputStream in = new BufferedInputStream(conn.getInputStream());
@@ -90,10 +92,10 @@ public class DownloadFragment extends Fragment {
 
                     requireActivity().runOnUiThread(() -> {
                         progressBar.setVisibility(View.GONE);
-                        Toast.makeText(context, "Saved as " + fileName + " in /Music/mario", Toast.LENGTH_LONG).show();
+                        Toast.makeText(context, "Saved as " + fileName + " in /Music", Toast.LENGTH_LONG).show();
                     });
                 } else {
-                    showError("Failed to download (API returned code: " + conn.getResponseCode() + ")");
+                    showError("Failed to download (Response code: " + conn.getResponseCode() + ")");
                 }
 
                 conn.disconnect();
