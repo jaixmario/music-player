@@ -62,7 +62,7 @@ public class DownloadFragment extends Fragment {
                 conn.connect();
 
                 if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
-                    File musicDir = new File(Environment.getExternalStorageDirectory(), "Music/mario");
+                    File musicDir = new File(Environment.getExternalStorageDirectory(), "Music/");
                     if (!musicDir.exists()) musicDir.mkdirs();
 
                     String fileName = "song_" + System.currentTimeMillis() + ".mp3";
