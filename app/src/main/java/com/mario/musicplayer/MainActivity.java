@@ -151,21 +151,26 @@ protected void onCreate(Bundle savedInstanceState) {
     int id = item.getItemId();
 
     if (id == R.id.nav_home) {
-        findViewById(R.id.fragment_container).setVisibility(View.GONE);
-        findViewById(R.id.mainContentArea).setVisibility(View.VISIBLE);
-        return true;
-    } else if (id == R.id.nav_download) {
-        Toast.makeText(this, "Download feature coming soon!", Toast.LENGTH_SHORT).show();
-        return true;
-    } else if (id == R.id.nav_settings) {
-    findViewById(R.id.mainContentArea).setVisibility(View.GONE);
-    findViewById(R.id.fullPlayerLayout).setVisibility(View.GONE); // hide full player
-    findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
-        getSupportFragmentManager().beginTransaction()
-            .replace(R.id.fragment_container, new SettingsFragment())
-            .addToBackStack(null)
-            .commit();
-        return true;
+    findViewById(R.id.fragment_container).setVisibility(View.GONE);
+    findViewById(R.id.mainContentArea).setVisibility(View.VISIBLE);
+
+    // Restore full or mini player based on visibility flag
+    boolean isFullPlayerVisible = prefs.getBoolean("is_full_player_visible", false);
+    MediaPlayer player = MusicService.getMediaPlayer();
+    boolean isPlaying = player != null && player.isPlaying();
+
+    if (isFullPlayerVisible) {
+        fullPlayerLayout.setVisibility(View.VISIBLE);
+        miniPlayer.setVisibility(View.GONE);
+    } else if (isPlaying) {
+        fullPlayerLayout.setVisibility(View.GONE);
+        miniPlayer.setVisibility(View.VISIBLE);
+    } else {
+        fullPlayerLayout.setVisibility(View.GONE);
+        miniPlayer.setVisibility(View.GONE);
+    }
+
+    return true;
     }
 
         return false;
