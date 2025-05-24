@@ -158,8 +158,9 @@ protected void onCreate(Bundle savedInstanceState) {
         Toast.makeText(this, "Download feature coming soon!", Toast.LENGTH_SHORT).show();
         return true;
     } else if (id == R.id.nav_settings) {
-        findViewById(R.id.mainContentArea).setVisibility(View.GONE);
-        findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
+    findViewById(R.id.mainContentArea).setVisibility(View.GONE);
+    findViewById(R.id.fullPlayerLayout).setVisibility(View.GONE); // hide full player
+    findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
         getSupportFragmentManager().beginTransaction()
             .replace(R.id.fragment_container, new SettingsFragment())
             .addToBackStack(null)
