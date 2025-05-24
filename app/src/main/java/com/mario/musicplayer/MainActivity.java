@@ -183,7 +183,6 @@ protected void onCreate(Bundle savedInstanceState) {
         .commit();
 
     return true;
-    }
 
     } else if (id == R.id.nav_settings) {
         findViewById(R.id.mainContentArea).setVisibility(View.GONE);
