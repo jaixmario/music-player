@@ -1,6 +1,7 @@
 package com.mario.musicplayer;
 
 import android.content.Context;
+import android.content.Intent;
 import android.media.MediaScannerConnection;
 import android.os.Bundle;
 import android.os.Environment;
@@ -63,11 +64,9 @@ public class DownloadFragment extends Fragment {
                 conn.connect();
 
                 if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
-                    // Save directly to /Music/
                     File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
                     if (!musicDir.exists()) musicDir.mkdirs();
 
-                    // Try to get original file name
                     String tempFileName = "song_" + System.currentTimeMillis() + ".mp3";
                     String contentDisp = conn.getHeaderField("Content-Disposition");
                     if (contentDisp != null && contentDisp.contains("filename=")) {
@@ -95,15 +94,16 @@ public class DownloadFragment extends Fragment {
                         progressBar.setVisibility(View.GONE);
                         Toast.makeText(context, "Saved as " + fileName + " in /Music", Toast.LENGTH_LONG).show();
 
-                        // Scan the new file so it's visible immediately
+                        // Scan and notify
                         MediaScannerConnection.scanFile(
-                        context,
-                        new String[]{outFile.getAbsolutePath()},
-                        null,
-                        (path, uri) -> requireActivity().runOnUiThread(() -> {
-                        Toast.makeText(context, "New song added to library", Toast.LENGTH_SHORT).show();
-                        context.sendBroadcast(new Intent("SONG_ADDED"));
-                        }));
+                                context,
+                                new String[]{outFile.getAbsolutePath()},
+                                null,
+                                (path, uri) -> requireActivity().runOnUiThread(() -> {
+                                    Toast.makeText(context, "New song added to library", Toast.LENGTH_SHORT).show();
+                                    context.sendBroadcast(new Intent("SONG_ADDED"));
+                                }));
+                    });
                 } else {
                     showError("Failed to download (Response code: " + conn.getResponseCode() + ")");
                 }
