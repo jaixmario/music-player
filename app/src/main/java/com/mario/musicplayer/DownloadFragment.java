@@ -58,7 +58,9 @@ public class DownloadFragment extends Fragment {
         progressBar.setVisibility(View.VISIBLE);
         new Thread(() -> {
             try {
-                String apiUrl = "https://f7bba52b-4af0-4efa-9b26-23a593b1826b-00-hxlccw5fjxp5.pike.replit.dev/download?url=" + URLEncoder.encode(ytUrl, "UTF-8");
+                SharedPreferences prefs = context.getSharedPreferences("music_player_prefs", Context.MODE_PRIVATE);
+                String baseUrl = prefs.getString("server_url", "https://f7bba52b-4af0-4efa-9b26-23a593b1826b-00-hxlccw5fjxp5.pike.replit.dev");
+                String apiUrl = baseUrl + "/download?url=" + URLEncoder.encode(ytUrl, "UTF-8");
                 URL url = new URL(apiUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.connect();

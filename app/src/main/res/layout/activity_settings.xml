@@ -19,12 +19,43 @@
         android:textColor="?android:attr/textColorPrimary"
         android:paddingBottom="24dp" />
 
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/serverUrlLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Server URL"
+        app:boxCornerRadiusTopStart="12dp"
+        app:boxCornerRadiusTopEnd="12dp"
+        app:boxCornerRadiusBottomStart="12dp"
+        app:boxCornerRadiusBottomEnd="12dp"
+        app:boxBackgroundMode="outline"
+        app:boxStrokeColor="?attr/colorPrimary">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/serverUrlInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="textUri"
+            android:hint="https://your.api.server"
+            android:maxLines="1" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/saveUrlButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Save Server URL"
+        android:layout_marginTop="12dp"
+        style="@style/Widget.MaterialComponents.Button"
+        app:cornerRadius="24dp"
+        app:rippleColor="?attr/colorOnPrimary" />
+
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnExportDb"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Export Database to Downloads"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="24dp"
         style="@style/Widget.MaterialComponents.Button"
         app:cornerRadius="24dp"
         app:rippleColor="?attr/colorOnPrimary" />
