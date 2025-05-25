@@ -48,32 +48,39 @@ public class MainActivity extends AppCompatActivity {
     private DatabaseHelper db;
 
     private final BroadcastReceiver updateReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String status = intent.getStringExtra("status");
-            String path = intent.getStringExtra("song_path");
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        String status = intent.getStringExtra("status");
+        String path = intent.getStringExtra("song_path");
 
-            if ("paused".equals(status)) {
-                playPauseButton.setImageResource(android.R.drawable.ic_media_play);
-                miniPlayPause.setImageResource(android.R.drawable.ic_media_play);
-                albumArt.clearAnimation();
-            } else if ("resumed".equals(status) || "started".equals(status)) {
-                playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
-                miniPlayPause.setImageResource(android.R.drawable.ic_media_pause);
-                albumArt.startAnimation(rotateAnim);
-                startSeekBarUpdate();
-            } else if ("next".equals(status) && path != null) {
-                currentSongIndex = findIndexByPath(path);
-                updateMetadataUI(path);
-                updateMiniPlayerUI();
-            } else if ("stopped".equals(status)) {
-                miniPlayer.setVisibility(View.GONE);
-                fullPlayerLayout.setVisibility(View.GONE);
-                albumArt.clearAnimation();
-            }
+        if ("paused".equals(status)) {
+            playPauseButton.setImageResource(android.R.drawable.ic_media_play);
+            miniPlayPause.setImageResource(android.R.drawable.ic_media_play);
+            albumArt.clearAnimation();
+        } else if ("resumed".equals(status) || "started".equals(status)) {
+            playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
+            miniPlayPause.setImageResource(android.R.drawable.ic_media_pause);
+            albumArt.startAnimation(rotateAnim);
+            startSeekBarUpdate();
+        } else if ("next".equals(status) && path != null) {
+            currentSongIndex = findIndexByPath(path);
+            updateMetadataUI(path);
+            updateMiniPlayerUI();
+        } else if ("stopped".equals(status)) {
+            miniPlayer.setVisibility(View.GONE);
+            fullPlayerLayout.setVisibility(View.GONE);
+            albumArt.clearAnimation();
         }
+    }
     };
-
+    
+    private final BroadcastReceiver songAddedReceiver = new BroadcastReceiver() {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        loadSongs(); // Reload songs when a new one is added
+    }
+    };
+ 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
