@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android) // Required for kotlinOptions
 }
 
 android {
@@ -28,10 +29,11 @@ android {
 
     buildTypes {
         debug {
-            // Debug config unchanged
+            // debug remains as-is
         }
         release {
             signingConfig = signingConfigs.getByName("release")
+
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -47,10 +49,6 @@ android {
 
     kotlinOptions {
         jvmTarget = "11"
-    }
-
-    buildFeatures {
-        viewBinding = true // Optional: remove if unused
     }
 }
 
