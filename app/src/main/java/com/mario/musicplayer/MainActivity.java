@@ -518,7 +518,12 @@ public class MainActivity extends AppCompatActivity {
                     intent.setData(Uri.parse("package:" + getPackageName()));
                     startActivity(intent);
                 } catch (ActivityNotFoundException e) {
-                    Toast.makeText(this, "Your device doesn't support full storage access settings.", Toast.LENGTH_LONG).show();
+                    // Fallback to App Info screen
+                    Intent fallbackIntent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                    fallbackIntent.setData(Uri.parse("package:" + getPackageName()));
+                    startActivity(fallbackIntent);
+
+                    Toast.makeText(this, "Please grant 'All Files Access' in App Permissions.", Toast.LENGTH_LONG).show();
                 }
             } else {
                 Toast.makeText(this, "Not required on this Android version.", Toast.LENGTH_LONG).show();
