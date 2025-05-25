@@ -10,6 +10,8 @@ import android.view.View;
 import android.view.animation.*;
 import android.widget.*;
 import android.content.pm.PackageManager;
+import android.provider.Settings;
+import android.net.Uri;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
