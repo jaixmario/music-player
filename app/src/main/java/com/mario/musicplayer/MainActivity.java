@@ -417,59 +417,80 @@ protected void onCreate(Bundle savedInstanceState) {
 
     @Override
     protected void onResume() {
-        super.onResume();
-        registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
+    super.onResume();
 
-        if (songList == null || songList.isEmpty()) loadSongs();
-        currentSongIndex = prefs.getInt("last_index", -1);
-        boolean wasFullPlayerVisible = prefs.getBoolean("is_full_player_visible", false);
-
-        MediaPlayer player = MusicService.getMediaPlayer();
-        String currentPath = MusicService.getCurrentPath();
-
-        if (player != null && player.isPlaying() && currentPath != null
-                && currentSongIndex >= 0 && currentSongIndex < songList.size()) {
-
-            updateMetadataUI(currentPath);
-            updateMiniPlayerUI();
-
-            int duration = player.getDuration();
-            seekBar.setMax(duration);
-            durationText.setText(millisecondsToTimer(duration));
-
-            int currentPos = player.getCurrentPosition();
-            seekBar.setProgress(currentPos);
-            currentTimeText.setText(millisecondsToTimer(currentPos));
-
-            int progress = (int) ((currentPos / (float) duration) * 100);
-            miniSeekBar.setProgress(progress);
-
-            playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
-            miniPlayPause.setImageResource(android.R.drawable.ic_media_pause);
-
-            albumArt.startAnimation(rotateAnim);
-            startSeekBarUpdate();
-
-            if (wasFullPlayerVisible) {
-                fullPlayerLayout.setVisibility(View.VISIBLE);
-                miniPlayer.setVisibility(View.GONE);
-            } else {
-                fullPlayerLayout.setVisibility(View.GONE);
-                miniPlayer.setVisibility(View.VISIBLE);
+    // Scan new/moved music files in /Music to make them visible to MediaMetadataRetriever
+    File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
+    File[] files = musicDir.listFiles();
+    if (files != null) {
+        for (File f : files) {
+            if (f.isFile() && (f.getName().endsWith(".mp3") || f.getName().endsWith(".m4a"))) {
+                scanFile(this, f);
             }
-
-        } else {
-            miniPlayer.setVisibility(View.GONE);
-            fullPlayerLayout.setVisibility(View.GONE);
-            seekBar.setProgress(0);
-            miniSeekBar.setProgress(0);
-            currentTimeText.setText("0:00");
-            durationText.setText("0:00");
-            playPauseButton.setImageResource(android.R.drawable.ic_media_play);
-            miniPlayPause.setImageResource(android.R.drawable.ic_media_play);
-            albumArt.clearAnimation();
         }
     }
+
+    registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
+
+    if (songList == null || songList.isEmpty()) loadSongs();
+    currentSongIndex = prefs.getInt("last_index", -1);
+    boolean wasFullPlayerVisible = prefs.getBoolean("is_full_player_visible", false);
+
+    MediaPlayer player = MusicService.getMediaPlayer();
+    String currentPath = MusicService.getCurrentPath();
+
+    if (player != null && player.isPlaying() && currentPath != null
+            && currentSongIndex >= 0 && currentSongIndex < songList.size()) {
+
+        updateMetadataUI(currentPath);
+        updateMiniPlayerUI();
+
+        int duration = player.getDuration();
+        seekBar.setMax(duration);
+        durationText.setText(millisecondsToTimer(duration));
+
+        int currentPos = player.getCurrentPosition();
+        seekBar.setProgress(currentPos);
+        currentTimeText.setText(millisecondsToTimer(currentPos));
+
+        int progress = (int) ((currentPos / (float) duration) * 100);
+        miniSeekBar.setProgress(progress);
+
+        playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
+        miniPlayPause.setImageResource(android.R.drawable.ic_media_pause);
+
+        albumArt.startAnimation(rotateAnim);
+        startSeekBarUpdate();
+
+        if (wasFullPlayerVisible) {
+            fullPlayerLayout.setVisibility(View.VISIBLE);
+            miniPlayer.setVisibility(View.GONE);
+        } else {
+            fullPlayerLayout.setVisibility(View.GONE);
+            miniPlayer.setVisibility(View.VISIBLE);
+        }
+
+    } else {
+        miniPlayer.setVisibility(View.GONE);
+        fullPlayerLayout.setVisibility(View.GONE);
+        seekBar.setProgress(0);
+        miniSeekBar.setProgress(0);
+        currentTimeText.setText("0:00");
+        durationText.setText("0:00");
+        playPauseButton.setImageResource(android.R.drawable.ic_media_play);
+        miniPlayPause.setImageResource(android.R.drawable.ic_media_play);
+        albumArt.clearAnimation();
+    }
+    }
+    
+    private void scanFile(Context context, File file) {
+    MediaScannerConnection.scanFile(context,
+            new String[]{file.getAbsolutePath()},
+            null,
+            (path, uri) -> {
+                // Optional: log or refresh UI
+            });
+            }
 
     @Override
     protected void onPause() {
@@ -478,7 +499,7 @@ protected void onCreate(Bundle savedInstanceState) {
     }
 
     @Override
-public void onBackPressed() {
+    public void onBackPressed() {
     if (fullPlayerLayout.getVisibility() == View.VISIBLE) {
         fullPlayerLayout.setVisibility(View.GONE);
         miniPlayer.setVisibility(View.VISIBLE);
