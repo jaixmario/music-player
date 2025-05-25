@@ -72,8 +72,8 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-@Override
-protected void onCreate(Bundle savedInstanceState) {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     Thread.setDefaultUncaughtExceptionHandler(new CrashLogger(this));
     setContentView(R.layout.activity_main);
@@ -88,7 +88,6 @@ protected void onCreate(Bundle savedInstanceState) {
     miniArtist = findViewById(R.id.miniArtist);
     miniPlayPause = findViewById(R.id.miniPlayPause);
     miniSeekBar = findViewById(R.id.miniSeekBar);
-
     listView = findViewById(R.id.listView);
     playPauseButton = findViewById(R.id.playPauseButton);
     nextButton = findViewById(R.id.nextButton);
@@ -137,70 +136,77 @@ protected void onCreate(Bundle savedInstanceState) {
     miniPlayer.setVisibility(View.GONE);
     fullPlayerLayout.setVisibility(View.GONE);
 
-    if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
-            != PackageManager.PERMISSION_GRANTED) {
-        ActivityCompat.requestPermissions(this,
-                new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_PERMISSION);
-    } else {
-        loadSongs();
-    }
-
-   // Bottom NavigationView setup using if-else
-   BottomNavigationView navView = findViewById(R.id.bottomNavigationView);
-   navView.setOnItemSelectedListener(item -> {
-    int id = item.getItemId();
-
-    if (id == R.id.nav_home) {
-        findViewById(R.id.fragment_container).setVisibility(View.GONE);
-        findViewById(R.id.mainContentArea).setVisibility(View.VISIBLE);
-
-        boolean isFullPlayerVisible = prefs.getBoolean("is_full_player_visible", false);
-        MediaPlayer player = MusicService.getMediaPlayer();
-        boolean isPlaying = player != null && player.isPlaying();
-
-        if (isFullPlayerVisible) {
-            fullPlayerLayout.setVisibility(View.VISIBLE);
-            miniPlayer.setVisibility(View.GONE);
-        } else if (isPlaying) {
-            fullPlayerLayout.setVisibility(View.GONE);
-            miniPlayer.setVisibility(View.VISIBLE);
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (!Environment.isExternalStorageManager()) {
+            Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+            intent.setData(Uri.parse("package:" + getPackageName()));
+            startActivity(intent);
         } else {
-            fullPlayerLayout.setVisibility(View.GONE);
-            miniPlayer.setVisibility(View.GONE);
+            loadSongs();
         }
-
-        return true;
-
-    } else if (id == R.id.nav_download) {
-    findViewById(R.id.mainContentArea).setVisibility(View.GONE);
-    fullPlayerLayout.setVisibility(View.GONE);
-    miniPlayer.setVisibility(View.GONE);
-    findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
-
-    getSupportFragmentManager().beginTransaction()
-        .replace(R.id.fragment_container, new DownloadFragment())
-        .addToBackStack(null)
-        .commit();
-
-    return true;
-
-    } else if (id == R.id.nav_settings) {
-        findViewById(R.id.mainContentArea).setVisibility(View.GONE);
-        fullPlayerLayout.setVisibility(View.GONE);
-        miniPlayer.setVisibility(View.GONE);
-        findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
-
-        getSupportFragmentManager().beginTransaction()
-            .replace(R.id.fragment_container, new SettingsFragment())
-            .addToBackStack(null)
-            .commit();
-
-        return true;
+    } else {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    REQUEST_PERMISSION);
+        } else {
+            loadSongs();
+        }
     }
 
-    return false;
+    BottomNavigationView navView = findViewById(R.id.bottomNavigationView);
+    navView.setOnItemSelectedListener(item -> {
+        int id = item.getItemId();
+
+        if (id == R.id.nav_home) {
+            findViewById(R.id.fragment_container).setVisibility(View.GONE);
+            findViewById(R.id.mainContentArea).setVisibility(View.VISIBLE);
+
+            boolean isFullPlayerVisible = prefs.getBoolean("is_full_player_visible", false);
+            MediaPlayer player = MusicService.getMediaPlayer();
+            boolean isPlaying = player != null && player.isPlaying();
+
+            if (isFullPlayerVisible) {
+                fullPlayerLayout.setVisibility(View.VISIBLE);
+                miniPlayer.setVisibility(View.GONE);
+            } else if (isPlaying) {
+                fullPlayerLayout.setVisibility(View.GONE);
+                miniPlayer.setVisibility(View.VISIBLE);
+            } else {
+                fullPlayerLayout.setVisibility(View.GONE);
+                miniPlayer.setVisibility(View.GONE);
+            }
+
+            return true;
+        } else if (id == R.id.nav_download) {
+            findViewById(R.id.mainContentArea).setVisibility(View.GONE);
+            fullPlayerLayout.setVisibility(View.GONE);
+            miniPlayer.setVisibility(View.GONE);
+            findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
+
+            getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, new DownloadFragment())
+                .addToBackStack(null)
+                .commit();
+
+            return true;
+        } else if (id == R.id.nav_settings) {
+            findViewById(R.id.mainContentArea).setVisibility(View.GONE);
+            fullPlayerLayout.setVisibility(View.GONE);
+            miniPlayer.setVisibility(View.GONE);
+            findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
+
+            getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, new SettingsFragment())
+                .addToBackStack(null)
+                .commit();
+
+            return true;
+        }
+        return false;
     });
-       }
+    }
     private void loadSongs() {
         File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
         songList = findSongs(musicDir);
@@ -419,7 +425,15 @@ protected void onCreate(Bundle savedInstanceState) {
     protected void onResume() {
     super.onResume();
 
-    // Scan new/moved music files in /Music to make them visible to MediaMetadataRetriever
+    // Ask again if user returned from settings without granting access
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (!Environment.isExternalStorageManager()) {
+            Toast.makeText(this, "Full storage access required to load songs", Toast.LENGTH_LONG).show();
+            return;
+        }
+    }
+
+    // Scan new/moved music files in /Music
     File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
     File[] files = musicDir.listFiles();
     if (files != null) {
@@ -469,7 +483,6 @@ protected void onCreate(Bundle savedInstanceState) {
             fullPlayerLayout.setVisibility(View.GONE);
             miniPlayer.setVisibility(View.VISIBLE);
         }
-
     } else {
         miniPlayer.setVisibility(View.GONE);
         fullPlayerLayout.setVisibility(View.GONE);
