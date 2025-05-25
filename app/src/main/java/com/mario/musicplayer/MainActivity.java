@@ -12,7 +12,7 @@ import android.widget.*;
 import android.content.pm.PackageManager;
 import android.provider.Settings;
 import android.net.Uri;
-
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -140,9 +140,7 @@ public class MainActivity extends AppCompatActivity {
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         if (!Environment.isExternalStorageManager()) {
-            Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
-            intent.setData(Uri.parse("package:" + getPackageName()));
-            startActivity(intent);
+            showFullStoragePermissionDialog();
         } else {
             loadSongs();
         }
@@ -506,6 +504,22 @@ public class MainActivity extends AppCompatActivity {
                 // Optional: log or refresh UI
             });
             }
+            
+    private void showFullStoragePermissionDialog() {
+    new AlertDialog.Builder(this)
+        .setTitle("Allow Full Storage Access")
+        .setMessage("To access and play all your music files, the app needs permission to manage all files on your device.\n\nPlease tap 'Allow' and grant access on the next screen.")
+        .setCancelable(false)
+        .setPositiveButton("Allow", (dialog, which) -> {
+            Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+            intent.setData(Uri.parse("package:" + getPackageName()));
+            startActivity(intent);
+        })
+        .setNegativeButton("Cancel", (dialog, which) -> {
+            Toast.makeText(this, "Permission is required to access music files.", Toast.LENGTH_LONG).show();
+        })
+        .show();
+        }
 
     @Override
     protected void onPause() {
