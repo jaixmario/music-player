@@ -1,6 +1,5 @@
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android") // <-- Classic plugin for Kotlin Android
+    alias(libs.plugins.android.application)
 }
 
 android {
@@ -22,7 +21,7 @@ android {
             // These four ENV vars will be provided by GitHub Actions
             storeFile = file(System.getenv("KEYSTORE_PATH"))
             storePassword = System.getenv("KEYSTORE_PASSWORD")
-            keyAlias = System.getenv("KEY_ALIAS")
+            keyAlias    = System.getenv("KEY_ALIAS")
             keyPassword = System.getenv("KEY_PASSWORD")
         }
     }
@@ -45,10 +44,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
-    }
-
-    kotlinOptions {
-        jvmTarget = "11"
     }
 }
 
