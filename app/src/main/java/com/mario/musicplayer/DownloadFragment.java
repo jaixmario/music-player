@@ -97,12 +97,13 @@ public class DownloadFragment extends Fragment {
 
                         // Scan the new file so it's visible immediately
                         MediaScannerConnection.scanFile(
-                                context,
-                                new String[]{outFile.getAbsolutePath()},
-                                null,
-                                (path, uri) -> requireActivity().runOnUiThread(() ->
-                                        Toast.makeText(context, "New song added to library", Toast.LENGTH_SHORT).show()));
-                    });
+                        context,
+                        new String[]{outFile.getAbsolutePath()},
+                        null,
+                        (path, uri) -> requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(context, "New song added to library", Toast.LENGTH_SHORT).show();
+                        context.sendBroadcast(new Intent("SONG_ADDED"));
+                        }));
                 } else {
                     showError("Failed to download (Response code: " + conn.getResponseCode() + ")");
                 }

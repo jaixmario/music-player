@@ -444,7 +444,9 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // Register receivers
     registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
+    registerReceiver(songAddedReceiver, new IntentFilter("SONG_ADDED"));
 
     if (songList == null || songList.isEmpty()) loadSongs();
     currentSongIndex = prefs.getInt("last_index", -1);
@@ -496,6 +498,13 @@ public class MainActivity extends AppCompatActivity {
     }
     }
     
+    @Override
+    protected void onPause() {
+    super.onPause();
+    unregisterReceiver(updateReceiver);
+    unregisterReceiver(songAddedReceiver);
+    } 
+    
     private void scanFile(Context context, File file) {
     MediaScannerConnection.scanFile(context,
             new String[]{file.getAbsolutePath()},
@@ -535,11 +544,6 @@ public class MainActivity extends AppCompatActivity {
         .show();
         }
 
-    @Override
-    protected void onPause() {
-        super.onPause();
-        unregisterReceiver(updateReceiver);
-    }
 
     @Override
     public void onBackPressed() {
