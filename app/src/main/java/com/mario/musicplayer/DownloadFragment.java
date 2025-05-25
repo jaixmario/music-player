@@ -1,6 +1,7 @@
 package com.mario.musicplayer;
 
 import android.content.Context;
+import android.media.MediaScannerConnection;
 import android.os.Bundle;
 import android.os.Environment;
 import android.view.LayoutInflater;
@@ -93,6 +94,14 @@ public class DownloadFragment extends Fragment {
                     requireActivity().runOnUiThread(() -> {
                         progressBar.setVisibility(View.GONE);
                         Toast.makeText(context, "Saved as " + fileName + " in /Music", Toast.LENGTH_LONG).show();
+
+                        // Scan the new file so it's visible immediately
+                        MediaScannerConnection.scanFile(
+                                context,
+                                new String[]{outFile.getAbsolutePath()},
+                                null,
+                                (path, uri) -> requireActivity().runOnUiThread(() ->
+                                        Toast.makeText(context, "New song added to library", Toast.LENGTH_SHORT).show()));
                     });
                 } else {
                     showError("Failed to download (Response code: " + conn.getResponseCode() + ")");
