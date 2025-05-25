@@ -1,6 +1,6 @@
 plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android) // Required for kotlinOptions
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android") // <-- Classic plugin for Kotlin Android
 }
 
 android {
