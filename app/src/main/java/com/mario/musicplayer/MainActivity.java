@@ -496,6 +496,16 @@ public class MainActivity extends AppCompatActivity {
     }
     }
     
+    private void scanFile(Context context, File file) {
+    MediaScannerConnection.scanFile(context,
+            new String[]{file.getAbsolutePath()},
+            null,
+            (path, uri) -> {
+                // Optional: log or refresh UI
+            });
+            }
+            
+    
     private void showFullStoragePermissionDialog() {
     new AlertDialog.Builder(this)
         .setTitle("Allow Full Storage Access")
