@@ -496,24 +496,23 @@ public class MainActivity extends AppCompatActivity {
     }
     }
     
-    private void scanFile(Context context, File file) {
-    MediaScannerConnection.scanFile(context,
-            new String[]{file.getAbsolutePath()},
-            null,
-            (path, uri) -> {
-                // Optional: log or refresh UI
-            });
-            }
-            
     private void showFullStoragePermissionDialog() {
     new AlertDialog.Builder(this)
         .setTitle("Allow Full Storage Access")
         .setMessage("To access and play all your music files, the app needs permission to manage all files on your device.\n\nPlease tap 'Allow' and grant access on the next screen.")
         .setCancelable(false)
         .setPositiveButton("Allow", (dialog, which) -> {
-            Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
-            intent.setData(Uri.parse("package:" + getPackageName()));
-            startActivity(intent);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                try {
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                    intent.setData(Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                } catch (ActivityNotFoundException e) {
+                    Toast.makeText(this, "Your device doesn't support full storage access settings.", Toast.LENGTH_LONG).show();
+                }
+            } else {
+                Toast.makeText(this, "Not required on this Android version.", Toast.LENGTH_LONG).show();
+            }
         })
         .setNegativeButton("Cancel", (dialog, which) -> {
             Toast.makeText(this, "Permission is required to access music files.", Toast.LENGTH_LONG).show();
