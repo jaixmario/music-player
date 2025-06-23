@@ -28,6 +28,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.io.IOException; // <--- ADDED THIS IMPORT
 
 public class DownloadFragment extends Fragment {
 
@@ -53,11 +54,6 @@ public class DownloadFragment extends Fragment {
             if (ytUrl.isEmpty()) {
                 Toast.makeText(context, "Please enter a URL", Toast.LENGTH_SHORT).show();
             } else {
-                // On Android 10 (API 29) and above, we rely on MediaStore for saving.
-                // READ_EXTERNAL_STORAGE is still needed for older versions or if you want to list files directly.
-                // WRITE_EXTERNAL_STORAGE is deprecated for API 29+ but still needed for API 28-.
-                // No special permission check for MANAGE_EXTERNAL_STORAGE is needed here
-                // because we are using MediaStore, which doesn't require it for media files.
                 downloadMusicFromApi(ytUrl);
             }
         });
@@ -163,7 +159,7 @@ public class DownloadFragment extends Fragment {
                     showError("Failed to download (Response code: " + conn.getResponseCode() + ")");
                 }
 
-            } catch (Exception e) {
+            } catch (Exception e) { // Catching generic Exception to include IOException
                 showError("Error: " + e.getMessage());
                 e.printStackTrace();
             } finally {
@@ -171,7 +167,7 @@ public class DownloadFragment extends Fragment {
                     if (in != null) in.close();
                     if (out != null) out.close();
                     if (conn != null) conn.disconnect();
-                } catch (IOException e) {
+                } catch (IOException e) { // This IOException is now recognized
                     e.printStackTrace();
                 }
             }
