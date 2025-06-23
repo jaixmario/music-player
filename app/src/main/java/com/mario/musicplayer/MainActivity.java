@@ -22,6 +22,7 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.imageview.ShapeableImageView;
 import android.provider.MediaStore;
 import android.content.ContentUris;
+import androidx.annotation.Nullable; // <--- ADD THIS IMPORT
 
 import java.io.File;
 import java.io.IOException;
