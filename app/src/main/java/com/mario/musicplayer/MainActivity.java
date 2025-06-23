@@ -22,7 +22,7 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.imageview.ShapeableImageView;
 import android.provider.MediaStore;
 import android.content.ContentUris;
-import androidx.annotation.Nullable; // <--- ADD THIS IMPORT
+import androidx.annotation.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -312,19 +312,21 @@ public class MainActivity extends AppCompatActivity {
 
     private void loadSongsInBackground(@Nullable Uri safTreeUri) {
         executorService.execute(() -> {
-            ArrayList<String> newSongList = new ArrayList<>();
+            ArrayList<String> tempSongList;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                newSongList = getSongsFromMediaStore();
+                tempSongList = getSongsFromMediaStore();
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && safTreeUri != null) {
-                newSongList = getSongsFromSaf(safTreeUri);
+                tempSongList = getSongsFromSaf(safTreeUri);
             } else {
-                newSongList = getSongsFromLegacyPath();
+                tempSongList = getSongsFromLegacyPath();
             }
 
-            processAndSaveSongMetadata(newSongList);
+            processAndSaveSongMetadata(tempSongList);
+
+            final ArrayList<String> finalTempSongList = tempSongList;
 
             runOnUiThread(() -> {
-                songList = newSongList;
+                songList = finalTempSongList;
                 SongAdapter adapter = new SongAdapter(MainActivity.this, songList);
                 listView.setAdapter(adapter);
                 hideLoadingIndicators();
@@ -679,6 +681,7 @@ public class MainActivity extends AppCompatActivity {
             miniPlayer.setVisibility(View.VISIBLE);
             prefs.edit().putBoolean("is_full_player_visible", false).apply();
         } else if (getSupportFragmentManager().findFragmentById(R.id.fragment_container) instanceof SettingsFragment) {
+            // Block back press on settings fragment to prevent accidental exit
             return;
         } else {
             super.onBackPressed();
