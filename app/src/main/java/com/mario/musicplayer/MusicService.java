@@ -6,11 +6,13 @@ import android.media.*;
 import android.os.*;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
+import androidx.documentfile.provider.DocumentFile;
+import android.net.Uri;
+import android.database.Cursor;
+import android.provider.MediaStore;
 
 import java.io.*;
 import java.util.*;
-
-import android.database.Cursor;
 
 public class MusicService extends Service {
 
@@ -25,7 +27,7 @@ public class MusicService extends Service {
     private static MusicService instance;
     private String currentTitle = "Music Playing";
     private String currentArtist = "Enjoy your music";
-    private ArrayList<File> songList = new ArrayList<>();
+    private ArrayList<String> songList = new ArrayList<>();
     public int currentIndex = -1;
     private SharedPreferences prefs;
 
@@ -35,12 +37,12 @@ public class MusicService extends Service {
         return instance != null ? instance.mediaPlayer : null;
     }
 
-    public static String getCurrentPath() {
+    public static String getCurrentSongIdentifier() {
         return (instance != null &&
                 instance.mediaPlayer != null &&
                 instance.currentIndex >= 0 &&
                 instance.currentIndex < instance.songList.size())
-                ? instance.songList.get(instance.currentIndex).getAbsolutePath()
+                ? instance.songList.get(instance.currentIndex)
                 : null;
     }
 
@@ -56,20 +58,20 @@ public class MusicService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null || intent.getAction() == null) {
-            stopSelf();  // Or just log and ignore
+            stopSelf();
             return START_NOT_STICKY;
         }
 
         String action = intent.getAction();
 
         if (ACTION_START.equals(action)) {
-            String path = intent.getStringExtra("song_path");
-            if (path != null) {
-                currentIndex = findIndexByPath(path);
+            String songIdentifier = intent.getStringExtra("song_identifier");
+            if (songIdentifier != null) {
+                currentIndex = findIndexByIdentifier(songIdentifier);
                 prefs.edit().putInt("last_index", currentIndex).apply();
-                extractMetadata(path);
-                startMediaPlayer(path);
-                sendBroadcastUpdate("started", path);
+                extractMetadata(songIdentifier);
+                startMediaPlayer(songIdentifier);
+                sendBroadcastUpdate("started", songIdentifier);
             }
 
         } else if (ACTION_PAUSE.equals(action)) {
@@ -102,12 +104,17 @@ public class MusicService extends Service {
         return START_STICKY;
     }
 
-    private void startMediaPlayer(String path) {
+    private void startMediaPlayer(String songIdentifier) {
         try {
             if (mediaPlayer != null) mediaPlayer.reset();
             else mediaPlayer = new MediaPlayer();
 
-            mediaPlayer.setDataSource(path);
+            if (songIdentifier.startsWith("content://")) {
+                mediaPlayer.setDataSource(this, Uri.parse(songIdentifier));
+            } else {
+                mediaPlayer.setDataSource(songIdentifier);
+            }
+
             mediaPlayer.prepare();
             mediaPlayer.start();
 
@@ -121,10 +128,10 @@ public class MusicService extends Service {
                     stopSelf();
                 } else {
                     prefs.edit().putInt("last_index", currentIndex).apply();
-                    String nextPath = songList.get(currentIndex).getAbsolutePath();
-                    extractMetadata(nextPath);
-                    startMediaPlayer(nextPath);
-                    sendBroadcastUpdate("next", nextPath);
+                    String nextSongIdentifier = songList.get(currentIndex);
+                    extractMetadata(nextSongIdentifier);
+                    startMediaPlayer(nextSongIdentifier);
+                    sendBroadcastUpdate("next", nextSongIdentifier);
                 }
             });
 
@@ -135,16 +142,16 @@ public class MusicService extends Service {
 
     private void playSongAt(int index) {
         if (index < 0 || index >= songList.size()) return;
-        File file = songList.get(index);
+        String songIdentifier = songList.get(index);
         currentIndex = index;
         prefs.edit().putInt("last_index", index).apply();
-        extractMetadata(file.getAbsolutePath());
-        startMediaPlayer(file.getAbsolutePath());
-        sendBroadcastUpdate("next", file.getAbsolutePath());
+        extractMetadata(songIdentifier);
+        startMediaPlayer(songIdentifier);
+        sendBroadcastUpdate("next", songIdentifier);
     }
 
-    private void extractMetadata(String path) {
-        Cursor cursor = db.getSong(path);
+    private void extractMetadata(String songIdentifier) {
+        Cursor cursor = db.getSong(songIdentifier);
         if (cursor.moveToFirst()) {
             currentTitle = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_TITLE));
             currentArtist = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_ARTIST));
@@ -155,10 +162,10 @@ public class MusicService extends Service {
         cursor.close();
     }
 
-    private void sendBroadcastUpdate(String status, @Nullable String path) {
+    private void sendBroadcastUpdate(String status, @Nullable String songIdentifier) {
         Intent intent = new Intent("UPDATE_UI");
         intent.putExtra("status", status);
-        if (path != null) intent.putExtra("song_path", path);
+        if (songIdentifier != null) intent.putExtra("song_identifier", songIdentifier);
         sendBroadcast(intent);
     }
 
@@ -189,25 +196,82 @@ public class MusicService extends Service {
     }
 
     private void loadSongs() {
-        File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
-        findSongs(musicDir);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            loadSongsFromMediaStore();
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            String storedUriString = prefs.getString("music_folder_uri", null);
+            if (storedUriString != null) {
+                Uri storedUri = Uri.parse(storedUriString);
+                DocumentFile pickedDir = DocumentFile.fromTreeUri(this, storedUri);
+                if (pickedDir != null && pickedDir.isDirectory()) {
+                    findSongsInDocumentFile(pickedDir);
+                }
+            }
+        } else {
+            File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
+            findSongsInFile(musicDir);
+        }
     }
 
-    private void findSongs(File dir) {
+    private void loadSongsFromMediaStore() {
+        Uri collection;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL);
+        } else {
+            collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
+        }
+
+        String[] projection = new String[]{
+                MediaStore.Audio.Media._ID,
+                MediaStore.Audio.Media.DISPLAY_NAME,
+                MediaStore.Audio.Media.DATA
+        };
+
+        try (Cursor cursor = getContentResolver().query(
+                collection,
+                projection,
+                null,
+                null,
+                null
+        )) {
+            if (cursor != null) {
+                int idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID);
+                while (cursor.moveToNext()) {
+                    long id = cursor.getLong(idColumn);
+                    Uri contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id);
+                    songList.add(contentUri.toString());
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void findSongsInFile(File dir) {
         File[] files = dir.listFiles();
         if (files != null) {
             for (File file : files) {
-                if (file.isDirectory()) findSongs(file);
+                if (file.isDirectory()) findSongsInFile(file);
                 else if (file.getName().endsWith(".mp3") || file.getName().endsWith(".m4a")) {
-                    songList.add(file);
+                    songList.add(file.getAbsolutePath());
                 }
             }
         }
     }
 
-    private int findIndexByPath(String path) {
+    private void findSongsInDocumentFile(DocumentFile dir) {
+        for (DocumentFile file : dir.listFiles()) {
+            if (file.isDirectory()) {
+                findSongsInDocumentFile(file);
+            } else if (file.isFile() && (file.getName().endsWith(".mp3") || file.getName().endsWith(".m4a"))) {
+                songList.add(file.getUri().toString());
+            }
+        }
+    }
+
+    private int findIndexByIdentifier(String identifier) {
         for (int i = 0; i < songList.size(); i++) {
-            if (songList.get(i).getAbsolutePath().equals(path)) {
+            if (songList.get(i).equals(identifier)) {
                 return i;
             }
         }
