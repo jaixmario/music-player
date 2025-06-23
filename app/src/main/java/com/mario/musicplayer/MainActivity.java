@@ -20,12 +20,14 @@ import androidx.documentfile.provider.DocumentFile;
 import androidx.palette.graphics.Palette;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.imageview.ShapeableImageView;
-import android.provider.MediaStore; // Added
-import android.content.ContentUris; // Added
+import android.provider.MediaStore;
+import android.content.ContentUris;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -41,6 +43,9 @@ public class MainActivity extends AppCompatActivity {
     private TextView miniTitle, miniArtist;
     private ImageButton miniPlayPause;
 
+    private ProgressBar loadingProgressBar;
+    private TextView loadingStatusText;
+
     private ArrayList<String> songList;
     private int currentSongIndex = -1;
     private final int REQUEST_POST_NOTIFICATIONS = 1002;
@@ -49,6 +54,7 @@ public class MainActivity extends AppCompatActivity {
     private SharedPreferences prefs;
 
     private DatabaseHelper db;
+    private ExecutorService executorService;
 
     private ActivityResultLauncher<Uri> openDocumentTreeLauncher;
     private ActivityResultLauncher<String[]> requestPermissionLauncher;
@@ -95,6 +101,7 @@ public class MainActivity extends AppCompatActivity {
 
         db = new DatabaseHelper(this);
         prefs = getSharedPreferences("music_player_prefs", MODE_PRIVATE);
+        executorService = Executors.newSingleThreadExecutor();
 
         fullPlayerLayout = findViewById(R.id.fullPlayerLayout);
         miniPlayer = findViewById(R.id.miniPlayer);
@@ -116,14 +123,18 @@ public class MainActivity extends AppCompatActivity {
         seekBar = findViewById(R.id.seekBar);
         rotateAnim = AnimationUtils.loadAnimation(this, R.anim.rotate_album);
 
+        loadingProgressBar = findViewById(R.id.loadingProgressBar);
+        loadingStatusText = findViewById(R.id.loadingStatusText);
+
         openDocumentTreeLauncher = registerForActivityResult(new ActivityResultContracts.OpenDocumentTree(), uri -> {
             if (uri != null) {
                 getContentResolver().takePersistableUriPermission(uri,
                         Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
                 prefs.edit().putString("music_folder_uri", uri.toString()).apply();
-                loadSongsFromSaf(uri);
+                loadSongsInBackground(uri);
             } else {
                 Toast.makeText(this, "Music folder selection cancelled. Cannot load songs.", Toast.LENGTH_LONG).show();
+                hideLoadingIndicators();
             }
         });
 
@@ -139,6 +150,7 @@ public class MainActivity extends AppCompatActivity {
                 checkAndLoadSongs();
             } else {
                 Toast.makeText(this, "Permissions denied. Cannot load songs.", Toast.LENGTH_LONG).show();
+                hideLoadingIndicators();
             }
         });
 
@@ -238,19 +250,33 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void showLoadingIndicators() {
+        listView.setVisibility(View.GONE);
+        loadingProgressBar.setVisibility(View.VISIBLE);
+        loadingStatusText.setVisibility(View.VISIBLE);
+    }
+
+    private void hideLoadingIndicators() {
+        loadingProgressBar.setVisibility(View.GONE);
+        loadingStatusText.setVisibility(View.GONE);
+        listView.setVisibility(View.VISIBLE);
+    }
+
     private void checkAndLoadSongs() {
+        showLoadingIndicators();
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissionLauncher.launch(new String[]{Manifest.permission.READ_MEDIA_AUDIO});
             } else {
-                loadSongsFromMediaStore();
+                loadSongsInBackground(null);
             }
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             String storedUriString = prefs.getString("music_folder_uri", null);
             if (storedUriString != null) {
                 Uri storedUri = Uri.parse(storedUriString);
                 if (checkUriPermission(storedUri, android.os.Process.myPid(), android.os.Process.myUid(), Intent.FLAG_GRANT_READ_URI_PERMISSION) == PackageManager.PERMISSION_GRANTED) {
-                    loadSongsFromSaf(storedUri);
+                    loadSongsInBackground(storedUri);
                 } else {
                     showSafPermissionDialog();
                 }
@@ -261,7 +287,7 @@ public class MainActivity extends AppCompatActivity {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissionLauncher.launch(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE});
             } else {
-                loadSongsFromLegacyPath();
+                loadSongsInBackground(null);
             }
         }
     }
@@ -278,27 +304,52 @@ public class MainActivity extends AppCompatActivity {
                 })
                 .setNegativeButton("Cancel", (dialog, which) -> {
                     Toast.makeText(this, "Music folder selection is required to load songs.", Toast.LENGTH_LONG).show();
+                    hideLoadingIndicators();
                 })
                 .show();
     }
 
-    private void loadSongsFromLegacyPath() {
-        File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
-        songList = findSongsInFile(musicDir);
-        processAndDisplaySongs();
+    private void loadSongsInBackground(@Nullable Uri safTreeUri) {
+        executorService.execute(() -> {
+            ArrayList<String> newSongList = new ArrayList<>();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                newSongList = getSongsFromMediaStore();
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && safTreeUri != null) {
+                newSongList = getSongsFromSaf(safTreeUri);
+            } else {
+                newSongList = getSongsFromLegacyPath();
+            }
+
+            processAndSaveSongMetadata(newSongList);
+
+            runOnUiThread(() -> {
+                songList = newSongList;
+                SongAdapter adapter = new SongAdapter(MainActivity.this, songList);
+                listView.setAdapter(adapter);
+                hideLoadingIndicators();
+                Toast.makeText(MainActivity.this, "Music loaded!", Toast.LENGTH_SHORT).show();
+            });
+        });
     }
 
-    private void loadSongsFromSaf(Uri treeUri) {
-        songList = new ArrayList<>();
+    private ArrayList<String> getSongsFromLegacyPath() {
+        ArrayList<String> songs = new ArrayList<>();
+        File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
+        findSongsInFile(musicDir, songs);
+        return songs;
+    }
+
+    private ArrayList<String> getSongsFromSaf(Uri treeUri) {
+        ArrayList<String> songs = new ArrayList<>();
         DocumentFile pickedDir = DocumentFile.fromTreeUri(this, treeUri);
         if (pickedDir != null && pickedDir.isDirectory()) {
-            findSongsInDocumentFile(pickedDir);
+            findSongsInDocumentFile(pickedDir, songs);
         }
-        processAndDisplaySongs();
+        return songs;
     }
 
-    private void loadSongsFromMediaStore() {
-        songList = new ArrayList<>();
+    private ArrayList<String> getSongsFromMediaStore() {
+        ArrayList<String> songs = new ArrayList<>();
         Uri collection;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL);
@@ -323,23 +374,21 @@ public class MainActivity extends AppCompatActivity {
         )) {
             if (cursor != null) {
                 int idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID);
-                int dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA);
-
                 while (cursor.moveToNext()) {
                     long id = cursor.getLong(idColumn);
-                    String data = cursor.getString(dataColumn);
                     Uri contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id);
-                    songList.add(contentUri.toString());
+                    songs.add(contentUri.toString());
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-        processAndDisplaySongs();
+        return songs;
     }
 
-    private void processAndDisplaySongs() {
-        for (String songIdentifier : songList) {
+    private void processAndSaveSongMetadata(ArrayList<String> songsToProcess) {
+        ArrayList<DatabaseHelper.SongMetadata> metadataList = new ArrayList<>();
+        for (String songIdentifier : songsToProcess) {
             if (!db.isSongCached(songIdentifier)) {
                 MediaMetadataRetriever retriever = new MediaMetadataRetriever();
                 try {
@@ -356,11 +405,13 @@ public class MainActivity extends AppCompatActivity {
 
                     int duration = (durationStr != null) ? Integer.parseInt(durationStr) : 0;
 
-                    db.insertSong(songIdentifier,
+                    metadataList.add(new DatabaseHelper.SongMetadata(
+                            songIdentifier,
                             title != null ? title : "Unknown Title",
                             artist != null ? artist : "Unknown Artist",
                             duration,
-                            art);
+                            art
+                    ));
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {
@@ -372,34 +423,27 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
-
-        SongAdapter adapter = new SongAdapter(this, songList);
-        listView.setAdapter(adapter);
-
-        listView.setOnItemClickListener((parent, view, pos, id) -> {
-            currentSongIndex = pos;
-            playCurrentSong();
-        });
+        if (!metadataList.isEmpty()) {
+            db.insertSongsBatch(metadataList);
+        }
     }
 
-    private ArrayList<String> findSongsInFile(File dir) {
-        ArrayList<String> songs = new ArrayList<>();
+    private void findSongsInFile(File dir, ArrayList<String> songs) {
         File[] files = dir.listFiles();
         if (files != null) {
             for (File f : files) {
-                if (f.isDirectory()) songs.addAll(findSongsInFile(f));
+                if (f.isDirectory()) findSongsInFile(f, songs);
                 else if (f.getName().endsWith(".mp3") || f.getName().endsWith(".m4a")) songs.add(f.getAbsolutePath());
             }
         }
-        return songs;
     }
 
-    private void findSongsInDocumentFile(DocumentFile dir) {
+    private void findSongsInDocumentFile(DocumentFile dir, ArrayList<String> songs) {
         for (DocumentFile file : dir.listFiles()) {
             if (file.isDirectory()) {
-                findSongsInDocumentFile(file);
+                findSongsInDocumentFile(file, songs);
             } else if (file.isFile() && (file.getName().endsWith(".mp3") || file.getName().endsWith(".m4a"))) {
-                songList.add(file.getUri().toString());
+                songs.add(file.getUri().toString());
             }
         }
     }
