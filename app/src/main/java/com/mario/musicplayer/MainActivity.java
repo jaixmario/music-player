@@ -20,6 +20,8 @@ import androidx.documentfile.provider.DocumentFile;
 import androidx.palette.graphics.Palette;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.imageview.ShapeableImageView;
+import android.provider.MediaStore; // Added
+import android.content.ContentUris; // Added
 
 import java.io.File;
 import java.io.IOException;
@@ -247,7 +249,7 @@ public class MainActivity extends AppCompatActivity {
             String storedUriString = prefs.getString("music_folder_uri", null);
             if (storedUriString != null) {
                 Uri storedUri = Uri.parse(storedUriString);
-                if (checkUriPermission(storedUri, Process.myPid(), Process.myUid(), Intent.FLAG_GRANT_READ_URI_PERMISSION) == PackageManager.PERMISSION_GRANTED) {
+                if (checkUriPermission(storedUri, android.os.Process.myPid(), android.os.Process.myUid(), Intent.FLAG_GRANT_READ_URI_PERMISSION) == PackageManager.PERMISSION_GRANTED) {
                     loadSongsFromSaf(storedUri);
                 } else {
                     showSafPermissionDialog();
