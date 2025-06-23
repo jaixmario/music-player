@@ -67,12 +67,12 @@ public class MainActivity extends AppCompatActivity {
             String songIdentifier = intent.getStringExtra("song_identifier");
 
             if ("paused".equals(status)) {
-                playPauseButton.setImageResource(android.R.drawable.ic_media_play);
-                miniPlayPause.setImageResource(android.R.drawable.ic_media_play);
+                playPauseButton.setImageResource(R.drawable.ic_play); // Custom play icon
+                miniPlayPause.setImageResource(R.drawable.ic_play);
                 albumArt.clearAnimation();
             } else if ("resumed".equals(status) || "started".equals(status)) {
-                playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
-                miniPlayPause.setImageResource(android.R.drawable.ic_media_pause);
+                playPauseButton.setImageResource(R.drawable.ic_pause); // Custom pause icon
+                miniPlayPause.setImageResource(R.drawable.ic_pause);
                 albumArt.startAnimation(rotateAnim);
                 startSeekBarUpdate();
             } else if ("next".equals(status) && songIdentifier != null) {
@@ -81,6 +81,8 @@ public class MainActivity extends AppCompatActivity {
                 updateMiniPlayerUI();
             } else if ("completed".equals(status)) { // Handle song completion
                 playNext(); // Automatically play the next song
+            } else if ("previous".equals(status)) { // Handle previous action from notification
+                playPrevious();
             } else if ("stopped".equals(status)) {
                 miniPlayer.setVisibility(View.GONE);
                 fullPlayerLayout.setVisibility(View.GONE);
@@ -169,12 +171,12 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+            public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
         playPauseButton.setOnClickListener(v -> togglePlayPause());
-        nextButton.setOnClickListener(v -> playNext());
-        prevButton.setOnClickListener(v -> playPrevious());
+        nextButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_NEXT)); // Send action to service
+        prevButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_PREV)); // Send action to service
         miniPlayPause.setOnClickListener(v -> togglePlayPause());
         miniPlayer.setOnClickListener(v -> showFullPlayer());
 
@@ -483,8 +485,8 @@ public class MainActivity extends AppCompatActivity {
         intent.putExtra("song_identifier", songIdentifier);
         startService(intent);
 
-        playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
-        miniPlayPause.setImageResource(android.R.drawable.ic_media_pause);
+        playPauseButton.setImageResource(R.drawable.ic_pause); // Custom pause icon
+        miniPlayPause.setImageResource(R.drawable.ic_pause);
         albumArt.startAnimation(rotateAnim);
         startSeekBarUpdate();
 
@@ -600,6 +602,9 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         currentSongIndex = (currentSongIndex - 1 + songList.size()) % songList.size();
+        if (currentSongIndex < 0) { // Handle wrap-around for previous
+            currentSongIndex = songList.size() - 1;
+        }
         playCurrentSong();
     }
 
@@ -669,8 +674,8 @@ public class MainActivity extends AppCompatActivity {
             int progress = (int) ((currentPos / (float) duration) * 100);
             miniSeekBar.setProgress(progress);
 
-            playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
-            miniPlayPause.setImageResource(android.R.drawable.ic_media_pause);
+            playPauseButton.setImageResource(R.drawable.ic_pause); // Custom pause icon
+            miniPlayPause.setImageResource(R.drawable.ic_pause);
 
             albumArt.startAnimation(rotateAnim);
             startSeekBarUpdate();
@@ -689,8 +694,8 @@ public class MainActivity extends AppCompatActivity {
             miniSeekBar.setProgress(0);
             currentTimeText.setText("0:00");
             durationText.setText("0:00");
-            playPauseButton.setImageResource(android.R.drawable.ic_media_play);
-            miniPlayPause.setImageResource(android.R.drawable.ic_media_play);
+            playPauseButton.setImageResource(R.drawable.ic_play); // Custom play icon
+            miniPlayPause.setImageResource(R.drawable.ic_play);
             albumArt.clearAnimation();
         }
     }

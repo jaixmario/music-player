@@ -11,9 +11,18 @@ import androidx.core.app.NotificationCompat;
 import android.widget.Toast;
 import android.database.Cursor;
 import android.net.Uri;
-import androidx.media.app.NotificationCompat.MediaStyle; // Import MediaStyle
+import androidx.media.app.NotificationCompat.MediaStyle;
+import androidx.media2.session.MediaSession; // Note: This is Media2, but we're using MediaSessionCompat from androidx.media
+import androidx.media.session.MediaSessionCompat; // Correct import for MediaSessionCompat
+import androidx.media.session.PlaybackStateCompat;
+import androidx.media.session.MediaControllerCompat;
+import androidx.media.session.MediaSessionCompat.Callback;
+import androidx.media.MediaMetadataCompat;
 
 import java.io.IOException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class MusicService extends Service {
 
@@ -23,17 +32,22 @@ public class MusicService extends Service {
     public static final String ACTION_STOP = "STOP";
     public static final String ACTION_NEXT = "NEXT";
     public static final String ACTION_PREV = "PREV";
-    public static final String ACTION_LIKE = "LIKE"; // New action
-    public static final String ACTION_DISLIKE = "DISLIKE"; // New action
 
     private MediaPlayer mediaPlayer;
     private static MusicService instance;
     private String currentTitle = "Music Playing";
     private String currentArtist = "Enjoy your music";
     private String currentSongIdentifier = null;
-    private Bitmap currentAlbumArtBitmap = null; // To store album art for notification
+    private Bitmap currentAlbumArtBitmap = null;
 
     private DatabaseHelper db;
+
+    private MediaSessionCompat mediaSession;
+    private PlaybackStateCompat.Builder playbackStateBuilder;
+    private MediaMetadataCompat.Builder metadataBuilder;
+
+    private ScheduledExecutorService scheduledExecutorService;
+    private Handler handler = new Handler(Looper.getMainLooper()); // For UI updates on main thread
 
     public static MediaPlayer getMediaPlayer() {
         return instance != null ? instance.mediaPlayer : null;
@@ -47,7 +61,38 @@ public class MusicService extends Service {
     public void onCreate() {
         super.onCreate();
         instance = this;
-        db = new DatabaseHelper(this); // Corrected to DatabaseHelper
+        db = new DatabaseHelper(this);
+
+        // Initialize MediaSessionCompat
+        ComponentName mediaButtonReceiver = new ComponentName(getApplicationContext(), MediaButtonReceiver.class);
+        mediaSession = new MediaSessionCompat(getApplicationContext(), "MusicService", mediaButtonReceiver, null);
+        mediaSession.setFlags(
+                MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS |
+                MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS);
+
+        // Set initial PlaybackState
+        playbackStateBuilder = new PlaybackStateCompat.Builder()
+                .setActions(
+                        PlaybackStateCompat.ACTION_PLAY |
+                        PlaybackStateCompat.ACTION_PAUSE |
+                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT |
+                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS |
+                        PlaybackStateCompat.ACTION_SEEK_TO | // Crucial for seek bar
+                        PlaybackStateCompat.ACTION_PLAY_PAUSE);
+        mediaSession.setPlaybackState(playbackStateBuilder.build());
+
+        // Set MediaSession Callback
+        mediaSession.setCallback(new MediaSessionCallback());
+
+        // Set initial MediaMetadata
+        metadataBuilder = new MediaMetadataCompat.Builder();
+        mediaSession.setMetadata(metadataBuilder.build());
+
+        mediaSession.setActive(true);
+
+        // Schedule periodic updates for playback position
+        scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+        scheduledExecutorService.scheduleAtFixedRate(this::updatePlaybackState, 0, 500, TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -75,6 +120,7 @@ public class MusicService extends Service {
             case ACTION_PAUSE:
                 if (mediaPlayer != null && mediaPlayer.isPlaying()) {
                     mediaPlayer.pause();
+                    updatePlaybackState(PlaybackStateCompat.STATE_PAUSED);
                     stopForeground(true);
                     sendBroadcastUpdate("paused", currentSongIdentifier);
                 }
@@ -82,6 +128,7 @@ public class MusicService extends Service {
             case ACTION_RESUME:
                 if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
                     mediaPlayer.start();
+                    updatePlaybackState(PlaybackStateCompat.STATE_PLAYING);
                     startForeground(1, createNotification());
                     sendBroadcastUpdate("resumed", currentSongIdentifier);
                 }
@@ -91,21 +138,14 @@ public class MusicService extends Service {
                 stopSelf();
                 break;
             case ACTION_NEXT:
-                // These actions are now handled by MainActivity determining the next/previous song
+                // This action is now handled by MainActivity determining the next song
                 // and sending a new ACTION_START intent.
-                // This part of the service will likely not be reached if MainActivity is updated correctly.
-                Toast.makeText(this, "Next action received (handled by MainActivity).", Toast.LENGTH_SHORT).show();
+                // We just need to notify MainActivity to play next.
+                sendBroadcastUpdate("completed", currentSongIdentifier); // Simulate completion to trigger next song in MainActivity
                 break;
             case ACTION_PREV:
-                Toast.makeText(this, "Previous action received (handled by MainActivity).", Toast.LENGTH_SHORT).show();
-                break;
-            case ACTION_LIKE:
-                Toast.makeText(this, "Liked!", Toast.LENGTH_SHORT).show();
-                // Implement your like logic here (e.g., update database, send to server)
-                break;
-            case ACTION_DISLIKE:
-                Toast.makeText(this, "Disliked!", Toast.LENGTH_SHORT).show();
-                // Implement your dislike logic here
+                // Similar to ACTION_NEXT, notify MainActivity to play previous.
+                sendBroadcastUpdate("previous", currentSongIdentifier); // Custom broadcast for previous
                 break;
         }
 
@@ -121,6 +161,7 @@ public class MusicService extends Service {
                 mediaPlayer.setOnErrorListener((mp, what, extra) -> {
                     Toast.makeText(this, "Playback error: " + what + ", " + extra, Toast.LENGTH_LONG).show();
                     sendBroadcastUpdate("stopped", currentSongIdentifier);
+                    updatePlaybackState(PlaybackStateCompat.STATE_STOPPED);
                     stopForeground(true);
                     stopSelf();
                     return true;
@@ -135,12 +176,14 @@ public class MusicService extends Service {
             mediaPlayer.prepareAsync();
             mediaPlayer.setOnPreparedListener(mp -> {
                 mp.start();
+                updatePlaybackState(PlaybackStateCompat.STATE_PLAYING);
                 startForeground(1, createNotification());
                 sendBroadcastUpdate("started", currentSongIdentifier);
             });
 
             mediaPlayer.setOnCompletionListener(mp -> {
                 sendBroadcastUpdate("completed", currentSongIdentifier);
+                updatePlaybackState(PlaybackStateCompat.STATE_STOPPED); // Or STATE_SKIPPING_TO_NEXT
                 stopForeground(true);
                 stopSelf();
             });
@@ -149,24 +192,28 @@ public class MusicService extends Service {
             Toast.makeText(this, "IO Error playing song: " + e.getMessage(), Toast.LENGTH_LONG).show();
             e.printStackTrace();
             sendBroadcastUpdate("stopped", currentSongIdentifier);
+            updatePlaybackState(PlaybackStateCompat.STATE_ERROR);
             stopForeground(true);
             stopSelf();
         } catch (IllegalArgumentException e) {
             Toast.makeText(this, "Invalid song data: " + e.getMessage(), Toast.LENGTH_LONG).show();
             e.printStackTrace();
             sendBroadcastUpdate("stopped", currentSongIdentifier);
+            updatePlaybackState(PlaybackStateCompat.STATE_ERROR);
             stopForeground(true);
             stopSelf();
         } catch (SecurityException e) {
             Toast.makeText(this, "Permission denied to play song: " + e.getMessage(), Toast.LENGTH_LONG).show();
             e.printStackTrace();
             sendBroadcastUpdate("stopped", currentSongIdentifier);
+            updatePlaybackState(PlaybackStateCompat.STATE_ERROR);
             stopForeground(true);
             stopSelf();
         } catch (IllegalStateException e) {
             Toast.makeText(this, "Player state error: " + e.getMessage(), Toast.LENGTH_LONG).show();
             e.printStackTrace();
             sendBroadcastUpdate("stopped", currentSongIdentifier);
+            updatePlaybackState(PlaybackStateCompat.STATE_ERROR);
             stopForeground(true);
             stopSelf();
         }
@@ -199,6 +246,19 @@ public class MusicService extends Service {
         if (cursor != null) {
             cursor.close();
         }
+
+        // Update MediaMetadataCompat
+        metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentTitle);
+        metadataBuilder.putString(MediaMetadataCompat.METADATA_KEY_ARTIST, currentArtist);
+        if (currentAlbumArtBitmap != null) {
+            metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, currentAlbumArtBitmap);
+        } else {
+            metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, null);
+        }
+        if (mediaPlayer != null) {
+            metadataBuilder.putLong(MediaMetadataCompat.METADATA_KEY_DURATION, mediaPlayer.getDuration());
+        }
+        mediaSession.setMetadata(metadataBuilder.build());
     }
 
     private void sendBroadcastUpdate(String status, @Nullable String songIdentifier) {
@@ -206,6 +266,27 @@ public class MusicService extends Service {
         intent.putExtra("status", status);
         if (songIdentifier != null) intent.putExtra("song_identifier", songIdentifier);
         sendBroadcast(intent);
+    }
+
+    private void updatePlaybackState() {
+        if (mediaPlayer == null) return;
+
+        int state = PlaybackStateCompat.STATE_STOPPED;
+        if (mediaPlayer.isPlaying()) {
+            state = PlaybackStateCompat.STATE_PLAYING;
+        } else if (mediaPlayer.getCurrentPosition() > 0 && mediaPlayer.getDuration() > 0) {
+            state = PlaybackStateCompat.STATE_PAUSED;
+        }
+
+        updatePlaybackState(state);
+    }
+
+    private void updatePlaybackState(int state) {
+        long position = mediaPlayer != null ? mediaPlayer.getCurrentPosition() : 0;
+        playbackStateBuilder.setState(state, position, 1.0f); // 1.0f is playback speed
+        mediaSession.setPlaybackState(playbackStateBuilder.build());
+        // Update notification to reflect new state (e.g., play/pause button)
+        startForeground(1, createNotification());
     }
 
     private Notification createNotification() {
@@ -216,18 +297,17 @@ public class MusicService extends Service {
             if (manager != null) manager.createNotificationChannel(channel);
         }
 
+        // Get current playback state to determine play/pause icon
+        boolean isPlaying = mediaPlayer != null && mediaPlayer.isPlaying();
+        int playPauseIcon = isPlaying ? R.drawable.ic_pause : R.drawable.ic_play; // Custom play/pause icons
+
         // Intents for notification actions
         PendingIntent prevIntent = PendingIntent.getService(this, 0,
                 new Intent(this, MusicService.class).setAction(ACTION_PREV), PendingIntent.FLAG_IMMUTABLE);
-        PendingIntent pauseIntent = PendingIntent.getService(this, 1,
-                new Intent(this, MusicService.class).setAction(ACTION_PAUSE), PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent playPauseIntent = PendingIntent.getService(this, 1,
+                new Intent(this, MusicService.class).setAction(isPlaying ? ACTION_PAUSE : ACTION_RESUME), PendingIntent.FLAG_IMMUTABLE);
         PendingIntent nextIntent = PendingIntent.getService(this, 2,
                 new Intent(this, MusicService.class).setAction(ACTION_NEXT), PendingIntent.FLAG_IMMUTABLE);
-        PendingIntent likeIntent = PendingIntent.getService(this, 3,
-                new Intent(this, MusicService.class).setAction(ACTION_LIKE), PendingIntent.FLAG_IMMUTABLE);
-        PendingIntent dislikeIntent = PendingIntent.getService(this, 4,
-                new Intent(this, MusicService.class).setAction(ACTION_DISLIKE), PendingIntent.FLAG_IMMUTABLE);
-
 
         // Content intent to open MainActivity when notification is tapped
         Intent notificationIntent = new Intent(this, MainActivity.class);
@@ -241,7 +321,8 @@ public class MusicService extends Service {
                 .setSubText("MARIO 2.0") // Your app name or device name
                 .setContentIntent(contentIntent)
                 .setOngoing(true)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC); // Show content on lock screen
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // Show content on lock screen
+                .setOnlyAlertOnce(true); // Prevent repeated sound/vibration for updates
 
         // Set large icon (album art)
         if (currentAlbumArtBitmap != null) {
@@ -251,47 +332,108 @@ public class MusicService extends Service {
             builder.setLargeIcon(BitmapFactory.decodeResource(getResources(), android.R.drawable.ic_media_play));
         }
 
-        // Add actions (buttons)
+        // Add actions (buttons) - Order matters for compact view
         builder.addAction(new NotificationCompat.Action(
-                android.R.drawable.ic_media_previous, // Placeholder, replace with R.drawable.ic_prev if you have one
+                R.drawable.ic_prev, // Custom previous icon
                 "Previous",
                 prevIntent));
         builder.addAction(new NotificationCompat.Action(
-                android.R.drawable.ic_media_pause, // Placeholder, replace with R.drawable.ic_play_pause if you have one
-                "Pause",
-                pauseIntent));
+                playPauseIcon, // Custom play/pause icon
+                isPlaying ? "Pause" : "Play",
+                playPauseIntent));
         builder.addAction(new NotificationCompat.Action(
-                android.R.drawable.ic_media_next, // Placeholder, replace with R.drawable.ic_next if you have one
+                R.drawable.ic_next, // Custom next icon
                 "Next",
                 nextIntent));
-        builder.addAction(new NotificationCompat.Action(
-                R.drawable.ic_thumb_down, // You need to create this drawable
-                "Dislike",
-                dislikeIntent));
-        builder.addAction(new NotificationCompat.Action(
-                R.drawable.ic_thumb_up, // You need to create this drawable
-                "Like",
-                likeIntent));
 
-
-        // Apply MediaStyle
+        // Apply MediaStyle and connect to MediaSession
         builder.setStyle(new MediaStyle()
-                .setShowActionsInCompactView(1, 2) // Show Pause/Play and Next in compact view
-                // If you implement MediaSessionCompat, you would set its token here:
-                // .setMediaSession(mediaSession.getSessionToken())
+                .setMediaSession(mediaSession.getSessionToken())
+                .setShowActionsInCompactView(0, 1, 2) // Show Prev, Play/Pause, Next in compact view
         );
 
         return builder.build();
     }
 
+    private class MediaSessionCallback extends MediaSessionCompat.Callback {
+        @Override
+        public void onPlay() {
+            super.onPlay();
+            if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
+                mediaPlayer.start();
+                updatePlaybackState(PlaybackStateCompat.STATE_PLAYING);
+                startForeground(1, createNotification());
+                sendBroadcastUpdate("resumed", currentSongIdentifier);
+            } else if (mediaPlayer == null && currentSongIdentifier != null) {
+                // If player is null but a song is selected, start playback
+                startMediaPlayer(currentSongIdentifier);
+            }
+        }
+
+        @Override
+        public void onPause() {
+            super.onPause();
+            if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+                mediaPlayer.pause();
+                updatePlaybackState(PlaybackStateCompat.STATE_PAUSED);
+                stopForeground(true); // Stop foreground to remove persistent notification
+                sendBroadcastUpdate("paused", currentSongIdentifier);
+            }
+        }
+
+        @Override
+        public void onSkipToNext() {
+            super.onSkipToNext();
+            // Trigger next song in MainActivity
+            sendBroadcastUpdate("completed", currentSongIdentifier);
+        }
+
+        @Override
+        public void onSkipToPrevious() {
+            super.onSkipToPrevious();
+            // Trigger previous song in MainActivity
+            sendBroadcastUpdate("previous", currentSongIdentifier);
+        }
+
+        @Override
+        public void onSeekTo(long pos) {
+            super.onSeekTo(pos);
+            if (mediaPlayer != null) {
+                mediaPlayer.seekTo((int) pos);
+                updatePlaybackState(); // Update state with new position
+            }
+        }
+
+        @Override
+        public void onStop() {
+            super.onStop();
+            if (mediaPlayer != null) {
+                mediaPlayer.stop();
+                mediaPlayer.release();
+                mediaPlayer = null;
+            }
+            updatePlaybackState(PlaybackStateCompat.STATE_STOPPED);
+            stopForeground(true);
+            stopSelf();
+            sendBroadcastUpdate("stopped", currentSongIdentifier);
+        }
+    }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
-        sendBroadcastUpdate("stopped", currentSongIdentifier);
+        if (scheduledExecutorService != null) {
+            scheduledExecutorService.shutdownNow();
+        }
         if (mediaPlayer != null) {
             mediaPlayer.release();
             mediaPlayer = null;
         }
+        if (mediaSession != null) {
+            mediaSession.setActive(false);
+            mediaSession.release();
+        }
+        sendBroadcastUpdate("stopped", currentSongIdentifier);
         currentSongIdentifier = null;
         currentAlbumArtBitmap = null;
     }
@@ -299,6 +441,6 @@ public class MusicService extends Service {
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
-        return null;
+        return mediaSession.getSessionToken().getBinder(); // Return binder for MediaControllerCompat
     }
 }
