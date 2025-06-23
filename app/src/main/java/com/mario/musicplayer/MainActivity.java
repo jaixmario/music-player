@@ -79,6 +79,8 @@ public class MainActivity extends AppCompatActivity {
                 currentSongIndex = findIndexByIdentifier(songIdentifier);
                 updateMetadataUI(songIdentifier);
                 updateMiniPlayerUI();
+            } else if ("completed".equals(status)) { // Handle song completion
+                playNext(); // Automatically play the next song
             } else if ("stopped".equals(status)) {
                 miniPlayer.setVisibility(View.GONE);
                 fullPlayerLayout.setVisibility(View.GONE);
@@ -330,7 +332,18 @@ public class MainActivity extends AppCompatActivity {
                 SongAdapter adapter = new SongAdapter(MainActivity.this, songList);
                 listView.setAdapter(adapter);
                 hideLoadingIndicators();
-                Toast.makeText(MainActivity.this, "Music loaded!", Toast.LENGTH_SHORT).show();
+
+                if (songList.isEmpty()) {
+                    Toast.makeText(MainActivity.this, "No songs found.", Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(MainActivity.this, "Music loaded! Found " + songList.size() + " songs.", Toast.LENGTH_SHORT).show();
+                }
+
+                // Set the item click listener here after the adapter is set
+                listView.setOnItemClickListener((parent, view, pos, id) -> {
+                    currentSongIndex = pos;
+                    playCurrentSong();
+                });
             });
         });
     }
@@ -452,6 +465,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void playCurrentSong() {
+        if (songList == null || songList.isEmpty()) {
+            Toast.makeText(this, "No songs available to play.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (currentSongIndex < 0 || currentSongIndex >= songList.size()) {
+            Toast.makeText(this, "Invalid song selection.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         String songIdentifier = songList.get(currentSongIndex);
         updateMetadataUI(songIdentifier);
         prefs.edit().putInt("last_index", currentSongIndex).apply();
@@ -564,13 +586,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void playNext() {
-        if (songList == null || songList.isEmpty()) return;
+        if (songList == null || songList.isEmpty()) {
+            Toast.makeText(this, "No songs to play next.", Toast.LENGTH_SHORT).show();
+            return;
+        }
         currentSongIndex = (currentSongIndex + 1) % songList.size();
         playCurrentSong();
     }
 
     private void playPrevious() {
-        if (songList == null || songList.isEmpty()) return;
+        if (songList == null || songList.isEmpty()) {
+            Toast.makeText(this, "No songs to play previous.", Toast.LENGTH_SHORT).show();
+            return;
+        }
         currentSongIndex = (currentSongIndex - 1 + songList.size()) % songList.size();
         playCurrentSong();
     }
