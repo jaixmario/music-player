@@ -1,11 +1,15 @@
 package com.mario.musicplayer;
 
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.media.MediaScannerConnection;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,6 +24,7 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -48,6 +53,11 @@ public class DownloadFragment extends Fragment {
             if (ytUrl.isEmpty()) {
                 Toast.makeText(context, "Please enter a URL", Toast.LENGTH_SHORT).show();
             } else {
+                // On Android 10 (API 29) and above, we rely on MediaStore for saving.
+                // READ_EXTERNAL_STORAGE is still needed for older versions or if you want to list files directly.
+                // WRITE_EXTERNAL_STORAGE is deprecated for API 29+ but still needed for API 28-.
+                // No special permission check for MANAGE_EXTERNAL_STORAGE is needed here
+                // because we are using MediaStore, which doesn't require it for media files.
                 downloadMusicFromApi(ytUrl);
             }
         });
@@ -58,31 +68,64 @@ public class DownloadFragment extends Fragment {
     private void downloadMusicFromApi(String ytUrl) {
         progressBar.setVisibility(View.VISIBLE);
         new Thread(() -> {
+            HttpURLConnection conn = null;
+            InputStream in = null;
+            OutputStream out = null;
             try {
                 SharedPreferences prefs = context.getSharedPreferences("music_player_prefs", Context.MODE_PRIVATE);
                 String baseUrl = prefs.getString("server_url", "https://f7bba52b-4af0-4efa-9b26-23a593b1826b-00-hxlccw5fjxp5.pike.replit.dev");
                 String apiUrl = baseUrl + "/download?url=" + URLEncoder.encode(ytUrl, "UTF-8");
                 URL url = new URL(apiUrl);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn = (HttpURLConnection) url.openConnection();
                 conn.connect();
 
                 if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
-                    File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
-                    if (!musicDir.exists()) musicDir.mkdirs();
-
                     String tempFileName = "song_" + System.currentTimeMillis() + ".mp3";
                     String contentDisp = conn.getHeaderField("Content-Disposition");
                     if (contentDisp != null && contentDisp.contains("filename=")) {
                         int start = contentDisp.indexOf("filename=") + 9;
                         tempFileName = contentDisp.substring(start).replace("\"", "").trim();
+                        tempFileName = tempFileName.replaceAll("[^a-zA-Z0-9\\.\\-]", "_"); // Sanitize filename
+                    }
+                    final String fileName = tempFileName;
+
+                    Uri contentUri = null;
+                    File outFile = null;
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        // Use MediaStore for Android 10 (API 29) and above
+                        ContentValues values = new ContentValues();
+                        values.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName);
+                        values.put(MediaStore.MediaColumns.MIME_TYPE, "audio/mpeg"); // Assuming MP3
+                        values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_MUSIC);
+                        contentUri = context.getContentResolver().insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values);
+
+                        if (contentUri == null) {
+                            showError("Failed to create MediaStore entry.");
+                            return;
+                        }
+                        out = context.getContentResolver().openOutputStream(contentUri);
+
+                    } else {
+                        // Use direct file path for Android 9 (API 28) and below
+                        File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
+                        if (!musicDir.exists()) {
+                            boolean created = musicDir.mkdirs();
+                            if (!created) {
+                                showError("Failed to create Music directory.");
+                                return;
+                            }
+                        }
+                        outFile = new File(musicDir, fileName);
+                        out = new FileOutputStream(outFile);
                     }
 
-                    final String fileName = tempFileName;
-                    File outFile = new File(musicDir, fileName);
+                    if (out == null) {
+                        showError("Failed to open output stream.");
+                        return;
+                    }
 
-                    InputStream in = new BufferedInputStream(conn.getInputStream());
-                    FileOutputStream out = new FileOutputStream(outFile);
-
+                    in = new BufferedInputStream(conn.getInputStream());
                     byte[] buffer = new byte[1024];
                     int len;
                     while ((len = in.read(buffer)) != -1) {
@@ -90,30 +133,47 @@ public class DownloadFragment extends Fragment {
                     }
 
                     out.flush();
-                    out.close();
-                    in.close();
+
+                    final Uri finalContentUri = contentUri;
+                    final File finalOutFile = outFile;
 
                     requireActivity().runOnUiThread(() -> {
                         progressBar.setVisibility(View.GONE);
-                        Toast.makeText(context, "Saved as " + fileName + " in /Music", Toast.LENGTH_LONG).show();
+                        Toast.makeText(context, "Saved as " + fileName + " in Music folder", Toast.LENGTH_LONG).show();
 
-                        // Scan and notify
-                        MediaScannerConnection.scanFile(
-                                context,
-                                new String[]{outFile.getAbsolutePath()},
-                                null,
-                                (path, uri) -> requireActivity().runOnUiThread(() -> {
-                                    Toast.makeText(context, "New song added to library", Toast.LENGTH_SHORT).show();
-                                    context.sendBroadcast(new Intent("SONG_ADDED"));
-                                }));
+                        // Trigger MediaScanner to make the file visible
+                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                            // For older Android versions, use MediaScannerConnection
+                            MediaScannerConnection.scanFile(
+                                    context,
+                                    new String[]{finalOutFile.getAbsolutePath()},
+                                    null,
+                                    (path, uri) -> requireActivity().runOnUiThread(() -> {
+                                        Toast.makeText(context, "New song added to library", Toast.LENGTH_SHORT).show();
+                                        context.sendBroadcast(new Intent("SONG_ADDED"));
+                                    }));
+                        } else {
+                            // For Android 10+, MediaStore insertion usually handles scanning automatically.
+                            // Just send the broadcast to refresh the UI.
+                            Toast.makeText(context, "New song added to library", Toast.LENGTH_SHORT).show();
+                            context.sendBroadcast(new Intent("SONG_ADDED"));
+                        }
                     });
                 } else {
                     showError("Failed to download (Response code: " + conn.getResponseCode() + ")");
                 }
 
-                conn.disconnect();
             } catch (Exception e) {
                 showError("Error: " + e.getMessage());
+                e.printStackTrace();
+            } finally {
+                try {
+                    if (in != null) in.close();
+                    if (out != null) out.close();
+                    if (conn != null) conn.disconnect();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }).start();
     }
