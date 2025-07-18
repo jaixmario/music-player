@@ -10,25 +10,19 @@ import android.view.View;
 import android.view.animation.*;
 import android.widget.*;
 import android.content.pm.PackageManager;
+import android.provider.Settings;
 import android.net.Uri;
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.documentfile.provider.DocumentFile;
 import androidx.palette.graphics.Palette;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.imageview.ShapeableImageView;
-import android.provider.MediaStore;
-import android.content.ContentUris;
-import androidx.annotation.Nullable;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -44,378 +38,191 @@ public class MainActivity extends AppCompatActivity {
     private TextView miniTitle, miniArtist;
     private ImageButton miniPlayPause;
 
-    private ProgressBar loadingProgressBar;
-    private TextView loadingStatusText;
-
-    private ArrayList<String> songList;
+    private ArrayList<File> songList;
     private int currentSongIndex = -1;
-    private final int REQUEST_POST_NOTIFICATIONS = 1002;
+    private final int REQUEST_PERMISSION = 1001;
     private Handler handler = new Handler();
     private Animation rotateAnim;
     private SharedPreferences prefs;
 
     private DatabaseHelper db;
-    private ExecutorService executorService;
-
-    private ActivityResultLauncher<Uri> openDocumentTreeLauncher;
-    private ActivityResultLauncher<String[]> requestPermissionLauncher;
 
     private final BroadcastReceiver updateReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String status = intent.getStringExtra("status");
-            String songIdentifier = intent.getStringExtra("song_identifier");
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        String status = intent.getStringExtra("status");
+        String path = intent.getStringExtra("song_path");
 
-            if ("paused".equals(status)) {
-                playPauseButton.setImageResource(R.drawable.ic_play); // Custom play icon
-                miniPlayPause.setImageResource(R.drawable.ic_play);
-                albumArt.clearAnimation();
-            } else if ("resumed".equals(status) || "started".equals(status)) {
-                playPauseButton.setImageResource(R.drawable.ic_pause); // Custom pause icon
-                miniPlayPause.setImageResource(R.drawable.ic_pause);
-                albumArt.startAnimation(rotateAnim);
-                startSeekBarUpdate();
-            } else if ("next".equals(status) && songIdentifier != null) {
-                currentSongIndex = findIndexByIdentifier(songIdentifier);
-                updateMetadataUI(songIdentifier);
-                updateMiniPlayerUI();
-            } else if ("completed".equals(status)) { // Handle song completion
-                playNext(); // Automatically play the next song
-            } else if ("previous".equals(status)) { // Handle previous action from notification
-                playPrevious();
-            } else if ("stopped".equals(status)) {
-                miniPlayer.setVisibility(View.GONE);
-                fullPlayerLayout.setVisibility(View.GONE);
-                albumArt.clearAnimation();
-            }
+        if ("paused".equals(status)) {
+            playPauseButton.setImageResource(android.R.drawable.ic_media_play);
+            miniPlayPause.setImageResource(android.R.drawable.ic_media_play);
+            albumArt.clearAnimation();
+        } else if ("resumed".equals(status) || "started".equals(status)) {
+            playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
+            miniPlayPause.setImageResource(android.R.drawable.ic_media_pause);
+            albumArt.startAnimation(rotateAnim);
+            startSeekBarUpdate();
+        } else if ("next".equals(status) && path != null) {
+            currentSongIndex = findIndexByPath(path);
+            updateMetadataUI(path);
+            updateMiniPlayerUI();
+        } else if ("stopped".equals(status)) {
+            miniPlayer.setVisibility(View.GONE);
+            fullPlayerLayout.setVisibility(View.GONE);
+            albumArt.clearAnimation();
         }
+    }
     };
-
+    
     private final BroadcastReceiver songAddedReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            checkAndLoadSongs();
-        }
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        loadSongs(); // Reload songs when a new one is added
+    }
     };
-
+ 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        Thread.setDefaultUncaughtExceptionHandler(new CrashLogger(this));
-        setContentView(R.layout.activity_main);
+    super.onCreate(savedInstanceState);
+    Thread.setDefaultUncaughtExceptionHandler(new CrashLogger(this));
+    setContentView(R.layout.activity_main);
 
-        db = new DatabaseHelper(this);
-        prefs = getSharedPreferences("music_player_prefs", MODE_PRIVATE);
-        executorService = Executors.newSingleThreadExecutor();
+    db = new DatabaseHelper(this);
+    prefs = getSharedPreferences("music_player_prefs", MODE_PRIVATE);
 
-        fullPlayerLayout = findViewById(R.id.fullPlayerLayout);
-        miniPlayer = findViewById(R.id.miniPlayer);
-        miniAlbumArt = findViewById(R.id.miniAlbumArt);
-        miniTitle = findViewById(R.id.miniTitle);
-        miniArtist = findViewById(R.id.miniArtist);
-        miniPlayPause = findViewById(R.id.miniPlayPause);
-        miniSeekBar = findViewById(R.id.miniSeekBar);
-        listView = findViewById(R.id.listView);
-        playPauseButton = findViewById(R.id.playPauseButton);
-        nextButton = findViewById(R.id.nextButton);
-        prevButton = findViewById(R.id.prevButton);
-        albumArt = findViewById(R.id.albumArt);
-        blurGlow = findViewById(R.id.blurGlow);
-        titleText = findViewById(R.id.titleText);
-        artistText = findViewById(R.id.artistText);
-        currentTimeText = findViewById(R.id.currentTime);
-        durationText = findViewById(R.id.totalTime);
-        seekBar = findViewById(R.id.seekBar);
-        rotateAnim = AnimationUtils.loadAnimation(this, R.anim.rotate_album);
+    fullPlayerLayout = findViewById(R.id.fullPlayerLayout);
+    miniPlayer = findViewById(R.id.miniPlayer);
+    miniAlbumArt = findViewById(R.id.miniAlbumArt);
+    miniTitle = findViewById(R.id.miniTitle);
+    miniArtist = findViewById(R.id.miniArtist);
+    miniPlayPause = findViewById(R.id.miniPlayPause);
+    miniSeekBar = findViewById(R.id.miniSeekBar);
+    listView = findViewById(R.id.listView);
+    playPauseButton = findViewById(R.id.playPauseButton);
+    nextButton = findViewById(R.id.nextButton);
+    prevButton = findViewById(R.id.prevButton);
+    albumArt = findViewById(R.id.albumArt);
+    blurGlow = findViewById(R.id.blurGlow);
+    titleText = findViewById(R.id.titleText);
+    artistText = findViewById(R.id.artistText);
+    currentTimeText = findViewById(R.id.currentTime);
+    durationText = findViewById(R.id.totalTime);
+    seekBar = findViewById(R.id.seekBar);
+    rotateAnim = AnimationUtils.loadAnimation(this, R.anim.rotate_album);
 
-        loadingProgressBar = findViewById(R.id.loadingProgressBar);
-        loadingStatusText = findViewById(R.id.loadingStatusText);
-
-        openDocumentTreeLauncher = registerForActivityResult(new ActivityResultContracts.OpenDocumentTree(), uri -> {
-            if (uri != null) {
-                getContentResolver().takePersistableUriPermission(uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                prefs.edit().putString("music_folder_uri", uri.toString()).apply();
-                loadSongsInBackground(uri);
-            } else {
-                Toast.makeText(this, "Music folder selection cancelled. Cannot load songs.", Toast.LENGTH_LONG).show();
-                hideLoadingIndicators();
-            }
-        });
-
-        requestPermissionLauncher = registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), permissions -> {
-            boolean allGranted = true;
-            for (Boolean granted : permissions.values()) {
-                if (!granted) {
-                    allGranted = false;
-                    break;
-                }
-            }
-            if (allGranted) {
-                checkAndLoadSongs();
-            } else {
-                Toast.makeText(this, "Permissions denied. Cannot load songs.", Toast.LENGTH_LONG).show();
-                hideLoadingIndicators();
-            }
-        });
-
-        miniSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (fromUser) {
-                    MediaPlayer player = MusicService.getMediaPlayer();
-                    if (player != null) {
-                        int duration = player.getDuration();
-                        int newPos = (duration * progress) / 100;
-                        player.seekTo(newPos);
-                    }
-                }
-            }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
-
-        playPauseButton.setOnClickListener(v -> togglePlayPause());
-        nextButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_NEXT)); // Send action to service
-        prevButton.setOnClickListener(v -> sendActionToService(MusicService.ACTION_PREV)); // Send action to service
-        miniPlayPause.setOnClickListener(v -> togglePlayPause());
-        miniPlayer.setOnClickListener(v -> showFullPlayer());
-
-        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
-                if (fromUser) {
-                    MediaPlayer player = MusicService.getMediaPlayer();
-                    if (player != null) player.seekTo(progress);
-                }
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {}
-        });
-
-        miniPlayer.setVisibility(View.GONE);
-        fullPlayerLayout.setVisibility(View.GONE);
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissionLauncher.launch(new String[]{Manifest.permission.POST_NOTIFICATIONS});
-            }
-        }
-
-        checkAndLoadSongs();
-
-        BottomNavigationView navView = findViewById(R.id.bottomNavigationView);
-        navView.setOnItemSelectedListener(item -> {
-            int id = item.getItemId();
-
-            if (id == R.id.nav_home) {
-                findViewById(R.id.fragment_container).setVisibility(View.GONE);
-                findViewById(R.id.mainContentArea).setVisibility(View.VISIBLE);
-
-                boolean isFullPlayerVisible = prefs.getBoolean("is_full_player_visible", false);
+    miniSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+        @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+            if (fromUser) {
                 MediaPlayer player = MusicService.getMediaPlayer();
-                boolean isPlaying = player != null && player.isPlaying();
-
-                if (isFullPlayerVisible) {
-                    fullPlayerLayout.setVisibility(View.VISIBLE);
-                    miniPlayer.setVisibility(View.GONE);
-                } else if (isPlaying) {
-                    fullPlayerLayout.setVisibility(View.GONE);
-                    miniPlayer.setVisibility(View.VISIBLE);
-                } else {
-                    fullPlayerLayout.setVisibility(View.GONE);
-                    miniPlayer.setVisibility(View.GONE);
+                if (player != null) {
+                    int duration = player.getDuration();
+                    int newPos = (duration * progress) / 100;
+                    player.seekTo(newPos);
                 }
-
-                return true;
-            } else if (id == R.id.nav_download) {
-                findViewById(R.id.mainContentArea).setVisibility(View.GONE);
-                fullPlayerLayout.setVisibility(View.GONE);
-                miniPlayer.setVisibility(View.GONE);
-                findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
-
-                getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.fragment_container, new DownloadFragment())
-                    .addToBackStack(null)
-                    .commit();
-
-                return true;
-            } else if (id == R.id.nav_settings) {
-                findViewById(R.id.mainContentArea).setVisibility(View.GONE);
-                fullPlayerLayout.setVisibility(View.GONE);
-                miniPlayer.setVisibility(View.GONE);
-                findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
-
-                getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.fragment_container, new SettingsFragment())
-                    .addToBackStack(null)
-                    .commit();
-
-                return true;
             }
-            return false;
-        });
-    }
+        }
+        @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+        @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+    });
 
-    private void showLoadingIndicators() {
-        listView.setVisibility(View.GONE);
-        loadingProgressBar.setVisibility(View.VISIBLE);
-        loadingStatusText.setVisibility(View.VISIBLE);
-    }
+    playPauseButton.setOnClickListener(v -> togglePlayPause());
+    nextButton.setOnClickListener(v -> playNext());
+    prevButton.setOnClickListener(v -> playPrevious());
+    miniPlayPause.setOnClickListener(v -> togglePlayPause());
+    miniPlayer.setOnClickListener(v -> showFullPlayer());
 
-    private void hideLoadingIndicators() {
-        loadingProgressBar.setVisibility(View.GONE);
-        loadingStatusText.setVisibility(View.GONE);
-        listView.setVisibility(View.VISIBLE);
-    }
-
-    private void checkAndLoadSongs() {
-        showLoadingIndicators();
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissionLauncher.launch(new String[]{Manifest.permission.READ_MEDIA_AUDIO});
-            } else {
-                loadSongsInBackground(null);
+    seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+        public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+            if (fromUser) {
+                MediaPlayer player = MusicService.getMediaPlayer();
+                if (player != null) player.seekTo(progress);
             }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            String storedUriString = prefs.getString("music_folder_uri", null);
-            if (storedUriString != null) {
-                Uri storedUri = Uri.parse(storedUriString);
-                if (checkUriPermission(storedUri, android.os.Process.myPid(), android.os.Process.myUid(), Intent.FLAG_GRANT_READ_URI_PERMISSION) == PackageManager.PERMISSION_GRANTED) {
-                    loadSongsInBackground(storedUri);
-                } else {
-                    showSafPermissionDialog();
-                }
-            } else {
-                showSafPermissionDialog();
-            }
+        }
+        public void onStartTrackingTouch(SeekBar sb) {}
+        public void onStopTrackingTouch(SeekBar sb) {}
+    });
+
+    miniPlayer.setVisibility(View.GONE);
+    fullPlayerLayout.setVisibility(View.GONE);
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (!Environment.isExternalStorageManager()) {
+            showFullStoragePermissionDialog();
         } else {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissionLauncher.launch(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE});
-            } else {
-                loadSongsInBackground(null);
-            }
+            loadSongs();
+        }
+    } else {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    REQUEST_PERMISSION);
+        } else {
+            loadSongs();
         }
     }
 
-    private void showSafPermissionDialog() {
-        new AlertDialog.Builder(this)
-                .setTitle("Select Music Folder")
-                .setMessage("To play music, please select your music folder (e.g., 'Music' or 'Download') using the 'Use this folder' option in the next screen.")
-                .setCancelable(false)
-                .setPositiveButton("Select Folder", (dialog, which) -> {
-                    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-                    openDocumentTreeLauncher.launch(null);
-                })
-                .setNegativeButton("Cancel", (dialog, which) -> {
-                    Toast.makeText(this, "Music folder selection is required to load songs.", Toast.LENGTH_LONG).show();
-                    hideLoadingIndicators();
-                })
-                .show();
-    }
+    BottomNavigationView navView = findViewById(R.id.bottomNavigationView);
+    navView.setOnItemSelectedListener(item -> {
+        int id = item.getItemId();
 
-    private void loadSongsInBackground(@Nullable Uri safTreeUri) {
-        executorService.execute(() -> {
-            ArrayList<String> tempSongList;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                tempSongList = getSongsFromMediaStore();
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && safTreeUri != null) {
-                tempSongList = getSongsFromSaf(safTreeUri);
+        if (id == R.id.nav_home) {
+            findViewById(R.id.fragment_container).setVisibility(View.GONE);
+            findViewById(R.id.mainContentArea).setVisibility(View.VISIBLE);
+
+            boolean isFullPlayerVisible = prefs.getBoolean("is_full_player_visible", false);
+            MediaPlayer player = MusicService.getMediaPlayer();
+            boolean isPlaying = player != null && player.isPlaying();
+
+            if (isFullPlayerVisible) {
+                fullPlayerLayout.setVisibility(View.VISIBLE);
+                miniPlayer.setVisibility(View.GONE);
+            } else if (isPlaying) {
+                fullPlayerLayout.setVisibility(View.GONE);
+                miniPlayer.setVisibility(View.VISIBLE);
             } else {
-                tempSongList = getSongsFromLegacyPath();
+                fullPlayerLayout.setVisibility(View.GONE);
+                miniPlayer.setVisibility(View.GONE);
             }
 
-            processAndSaveSongMetadata(tempSongList);
+            return true;
+        } else if (id == R.id.nav_download) {
+            findViewById(R.id.mainContentArea).setVisibility(View.GONE);
+            fullPlayerLayout.setVisibility(View.GONE);
+            miniPlayer.setVisibility(View.GONE);
+            findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
 
-            final ArrayList<String> finalTempSongList = tempSongList;
+            getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, new DownloadFragment())
+                .addToBackStack(null)
+                .commit();
 
-            runOnUiThread(() -> {
-                songList = finalTempSongList;
-                SongAdapter adapter = new SongAdapter(MainActivity.this, songList);
-                listView.setAdapter(adapter);
-                hideLoadingIndicators();
+            return true;
+        } else if (id == R.id.nav_settings) {
+            findViewById(R.id.mainContentArea).setVisibility(View.GONE);
+            fullPlayerLayout.setVisibility(View.GONE);
+            miniPlayer.setVisibility(View.GONE);
+            findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
 
-                if (songList.isEmpty()) {
-                    Toast.makeText(MainActivity.this, "No songs found.", Toast.LENGTH_LONG).show();
-                } else {
-                    Toast.makeText(MainActivity.this, "Music loaded! Found " + songList.size() + " songs.", Toast.LENGTH_SHORT).show();
-                }
+            getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, new SettingsFragment())
+                .addToBackStack(null)
+                .commit();
 
-                // Set the item click listener here after the adapter is set
-                listView.setOnItemClickListener((parent, view, pos, id) -> {
-                    currentSongIndex = pos;
-                    playCurrentSong();
-                });
-            });
-        });
+            return true;
+        }
+        return false;
+    });
     }
-
-    private ArrayList<String> getSongsFromLegacyPath() {
-        ArrayList<String> songs = new ArrayList<>();
+    private void loadSongs() {
         File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
-        findSongsInFile(musicDir, songs);
-        return songs;
-    }
+        songList = findSongs(musicDir);
 
-    private ArrayList<String> getSongsFromSaf(Uri treeUri) {
-        ArrayList<String> songs = new ArrayList<>();
-        DocumentFile pickedDir = DocumentFile.fromTreeUri(this, treeUri);
-        if (pickedDir != null && pickedDir.isDirectory()) {
-            findSongsInDocumentFile(pickedDir, songs);
-        }
-        return songs;
-    }
-
-    private ArrayList<String> getSongsFromMediaStore() {
-        ArrayList<String> songs = new ArrayList<>();
-        Uri collection;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL);
-        } else {
-            collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
-        }
-
-        String[] projection = new String[]{
-                MediaStore.Audio.Media._ID,
-                MediaStore.Audio.Media.DISPLAY_NAME,
-                MediaStore.Audio.Media.DURATION,
-                MediaStore.Audio.Media.SIZE,
-                MediaStore.Audio.Media.DATA
-        };
-
-        try (Cursor cursor = getContentResolver().query(
-                collection,
-                projection,
-                null,
-                null,
-                null
-        )) {
-            if (cursor != null) {
-                int idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID);
-                while (cursor.moveToNext()) {
-                    long id = cursor.getLong(idColumn);
-                    Uri contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id);
-                    songs.add(contentUri.toString());
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return songs;
-    }
-
-    private void processAndSaveSongMetadata(ArrayList<String> songsToProcess) {
-        ArrayList<DatabaseHelper.SongMetadata> metadataList = new ArrayList<>();
-        for (String songIdentifier : songsToProcess) {
-            if (!db.isSongCached(songIdentifier)) {
+        for (File song : songList) {
+            if (!db.isSongCached(song.getAbsolutePath())) {
                 MediaMetadataRetriever retriever = new MediaMetadataRetriever();
                 try {
-                    if (songIdentifier.startsWith("content://")) {
-                        retriever.setDataSource(this, Uri.parse(songIdentifier));
-                    } else {
-                        retriever.setDataSource(songIdentifier);
-                    }
-
+                    retriever.setDataSource(song.getAbsolutePath());
                     String title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
                     String artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
                     String durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
@@ -423,13 +230,11 @@ public class MainActivity extends AppCompatActivity {
 
                     int duration = (durationStr != null) ? Integer.parseInt(durationStr) : 0;
 
-                    metadataList.add(new DatabaseHelper.SongMetadata(
-                            songIdentifier,
+                    db.insertSong(song.getAbsolutePath(),
                             title != null ? title : "Unknown Title",
                             artist != null ? artist : "Unknown Artist",
                             duration,
-                            art
-                    ));
+                            art);
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {
@@ -441,52 +246,28 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
-        if (!metadataList.isEmpty()) {
-            db.insertSongsBatch(metadataList);
-        }
-    }
 
-    private void findSongsInFile(File dir, ArrayList<String> songs) {
-        File[] files = dir.listFiles();
-        if (files != null) {
-            for (File f : files) {
-                if (f.isDirectory()) findSongsInFile(f, songs);
-                else if (f.getName().endsWith(".mp3") || f.getName().endsWith(".m4a")) songs.add(f.getAbsolutePath());
-            }
-        }
-    }
+        SongAdapter adapter = new SongAdapter(this, songList);
+        listView.setAdapter(adapter);
 
-    private void findSongsInDocumentFile(DocumentFile dir, ArrayList<String> songs) {
-        for (DocumentFile file : dir.listFiles()) {
-            if (file.isDirectory()) {
-                findSongsInDocumentFile(file, songs);
-            } else if (file.isFile() && (file.getName().endsWith(".mp3") || file.getName().endsWith(".m4a"))) {
-                songs.add(file.getUri().toString());
-            }
-        }
+        listView.setOnItemClickListener((parent, view, pos, id) -> {
+            currentSongIndex = pos;
+            playCurrentSong();
+        });
     }
 
     private void playCurrentSong() {
-        if (songList == null || songList.isEmpty()) {
-            Toast.makeText(this, "No songs available to play.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (currentSongIndex < 0 || currentSongIndex >= songList.size()) {
-            Toast.makeText(this, "Invalid song selection.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        String songIdentifier = songList.get(currentSongIndex);
-        updateMetadataUI(songIdentifier);
+        File song = songList.get(currentSongIndex);
+        updateMetadataUI(song.getAbsolutePath());
         prefs.edit().putInt("last_index", currentSongIndex).apply();
 
         Intent intent = new Intent(this, MusicService.class);
         intent.setAction(MusicService.ACTION_START);
-        intent.putExtra("song_identifier", songIdentifier);
+        intent.putExtra("song_path", song.getAbsolutePath());
         startService(intent);
 
-        playPauseButton.setImageResource(R.drawable.ic_pause); // Custom pause icon
-        miniPlayPause.setImageResource(R.drawable.ic_pause);
+        playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
+        miniPlayPause.setImageResource(android.R.drawable.ic_media_pause);
         albumArt.startAnimation(rotateAnim);
         startSeekBarUpdate();
 
@@ -495,8 +276,8 @@ public class MainActivity extends AppCompatActivity {
         showFullPlayer();
     }
 
-    private void updateMetadataUI(String songIdentifier) {
-        Cursor cursor = db.getSong(songIdentifier);
+    private void updateMetadataUI(String path) {
+        Cursor cursor = db.getSong(path);
         if (cursor.moveToFirst()) {
             String title = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_TITLE));
             String artist = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_ARTIST));
@@ -522,8 +303,8 @@ public class MainActivity extends AppCompatActivity {
     private void updateMiniPlayerUI() {
         if (songList == null || currentSongIndex < 0 || currentSongIndex >= songList.size()) return;
 
-        String songIdentifier = songList.get(currentSongIndex);
-        Cursor cursor = db.getSong(songIdentifier);
+        File song = songList.get(currentSongIndex);
+        Cursor cursor = db.getSong(song.getAbsolutePath());
         if (cursor.moveToFirst()) {
             String title = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_TITLE));
             String artist = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_ARTIST));
@@ -581,6 +362,18 @@ public class MainActivity extends AppCompatActivity {
         return String.format("%d:%02d", mins, secs);
     }
 
+    private ArrayList<File> findSongs(File dir) {
+        ArrayList<File> songs = new ArrayList<>();
+        File[] files = dir.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                if (f.isDirectory()) songs.addAll(findSongs(f));
+                else if (f.getName().endsWith(".mp3") || f.getName().endsWith(".m4a")) songs.add(f);
+            }
+        }
+        return songs;
+    }
+
     private void showFullPlayer() {
         fullPlayerLayout.setVisibility(View.VISIBLE);
         miniPlayer.setVisibility(View.GONE);
@@ -588,30 +381,21 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void playNext() {
-        if (songList == null || songList.isEmpty()) {
-            Toast.makeText(this, "No songs to play next.", Toast.LENGTH_SHORT).show();
-            return;
-        }
+        if (songList == null || songList.isEmpty()) return;
         currentSongIndex = (currentSongIndex + 1) % songList.size();
         playCurrentSong();
     }
 
     private void playPrevious() {
-        if (songList == null || songList.isEmpty()) {
-            Toast.makeText(this, "No songs to play previous.", Toast.LENGTH_SHORT).show();
-            return;
-        }
+        if (songList == null || songList.isEmpty()) return;
         currentSongIndex = (currentSongIndex - 1 + songList.size()) % songList.size();
-        if (currentSongIndex < 0) { // Handle wrap-around for previous
-            currentSongIndex = songList.size() - 1;
-        }
         playCurrentSong();
     }
 
-    private int findIndexByIdentifier(String identifier) {
+    private int findIndexByPath(String path) {
         if (songList == null) return -1;
         for (int i = 0; i < songList.size(); i++) {
-            if (songList.get(i).equals(identifier)) {
+            if (songList.get(i).getAbsolutePath().equals(path)) {
                 return i;
             }
         }
@@ -646,78 +430,140 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onResume() {
-        super.onResume();
+    super.onResume();
 
-        registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
-        registerReceiver(songAddedReceiver, new IntentFilter("SONG_ADDED"));
-
-        currentSongIndex = prefs.getInt("last_index", -1);
-        boolean wasFullPlayerVisible = prefs.getBoolean("is_full_player_visible", false);
-
-        MediaPlayer player = MusicService.getMediaPlayer();
-        String currentSongIdentifier = MusicService.getCurrentSongIdentifier();
-
-        if (player != null && player.isPlaying() && currentSongIdentifier != null
-                && songList != null && currentSongIndex >= 0 && currentSongIndex < songList.size()) {
-
-            updateMetadataUI(currentSongIdentifier);
-            updateMiniPlayerUI();
-
-            int duration = player.getDuration();
-            seekBar.setMax(duration);
-            durationText.setText(millisecondsToTimer(duration));
-
-            int currentPos = player.getCurrentPosition();
-            seekBar.setProgress(currentPos);
-            currentTimeText.setText(millisecondsToTimer(currentPos));
-
-            int progress = (int) ((currentPos / (float) duration) * 100);
-            miniSeekBar.setProgress(progress);
-
-            playPauseButton.setImageResource(R.drawable.ic_pause); // Custom pause icon
-            miniPlayPause.setImageResource(R.drawable.ic_pause);
-
-            albumArt.startAnimation(rotateAnim);
-            startSeekBarUpdate();
-
-            if (wasFullPlayerVisible) {
-                fullPlayerLayout.setVisibility(View.VISIBLE);
-                miniPlayer.setVisibility(View.GONE);
-            } else {
-                fullPlayerLayout.setVisibility(View.GONE);
-                miniPlayer.setVisibility(View.VISIBLE);
-            }
-        } else {
-            miniPlayer.setVisibility(View.GONE);
-            fullPlayerLayout.setVisibility(View.GONE);
-            seekBar.setProgress(0);
-            miniSeekBar.setProgress(0);
-            currentTimeText.setText("0:00");
-            durationText.setText("0:00");
-            playPauseButton.setImageResource(R.drawable.ic_play); // Custom play icon
-            miniPlayPause.setImageResource(R.drawable.ic_play);
-            albumArt.clearAnimation();
+    // Ask again if user returned from settings without granting access
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (!Environment.isExternalStorageManager()) {
+            Toast.makeText(this, "Full storage access required to load songs", Toast.LENGTH_LONG).show();
+            return;
         }
     }
 
+    // Scan new/moved music files in /Music
+    File musicDir = new File(Environment.getExternalStorageDirectory(), "Music");
+    File[] files = musicDir.listFiles();
+    if (files != null) {
+        for (File f : files) {
+            if (f.isFile() && (f.getName().endsWith(".mp3") || f.getName().endsWith(".m4a"))) {
+                scanFile(this, f);
+            }
+        }
+    }
+
+    // Register receivers
+    registerReceiver(updateReceiver, new IntentFilter("UPDATE_UI"));
+    registerReceiver(songAddedReceiver, new IntentFilter("SONG_ADDED"));
+
+    if (songList == null || songList.isEmpty()) loadSongs();
+    currentSongIndex = prefs.getInt("last_index", -1);
+    boolean wasFullPlayerVisible = prefs.getBoolean("is_full_player_visible", false);
+
+    MediaPlayer player = MusicService.getMediaPlayer();
+    String currentPath = MusicService.getCurrentPath();
+
+    if (player != null && player.isPlaying() && currentPath != null
+            && currentSongIndex >= 0 && currentSongIndex < songList.size()) {
+
+        updateMetadataUI(currentPath);
+        updateMiniPlayerUI();
+
+        int duration = player.getDuration();
+        seekBar.setMax(duration);
+        durationText.setText(millisecondsToTimer(duration));
+
+        int currentPos = player.getCurrentPosition();
+        seekBar.setProgress(currentPos);
+        currentTimeText.setText(millisecondsToTimer(currentPos));
+
+        int progress = (int) ((currentPos / (float) duration) * 100);
+        miniSeekBar.setProgress(progress);
+
+        playPauseButton.setImageResource(android.R.drawable.ic_media_pause);
+        miniPlayPause.setImageResource(android.R.drawable.ic_media_pause);
+
+        albumArt.startAnimation(rotateAnim);
+        startSeekBarUpdate();
+
+        if (wasFullPlayerVisible) {
+            fullPlayerLayout.setVisibility(View.VISIBLE);
+            miniPlayer.setVisibility(View.GONE);
+        } else {
+            fullPlayerLayout.setVisibility(View.GONE);
+            miniPlayer.setVisibility(View.VISIBLE);
+        }
+    } else {
+        miniPlayer.setVisibility(View.GONE);
+        fullPlayerLayout.setVisibility(View.GONE);
+        seekBar.setProgress(0);
+        miniSeekBar.setProgress(0);
+        currentTimeText.setText("0:00");
+        durationText.setText("0:00");
+        playPauseButton.setImageResource(android.R.drawable.ic_media_play);
+        miniPlayPause.setImageResource(android.R.drawable.ic_media_play);
+        albumArt.clearAnimation();
+    }
+    }
+    
     @Override
     protected void onPause() {
-        super.onPause();
-        unregisterReceiver(updateReceiver);
-        unregisterReceiver(songAddedReceiver);
-    }
+    super.onPause();
+    unregisterReceiver(updateReceiver);
+    unregisterReceiver(songAddedReceiver);
+    } 
+    
+    private void scanFile(Context context, File file) {
+    MediaScannerConnection.scanFile(context,
+            new String[]{file.getAbsolutePath()},
+            null,
+            (path, uri) -> {
+                // Optional: log or refresh UI
+            });
+            }
+            
+    
+    private void showFullStoragePermissionDialog() {
+    new AlertDialog.Builder(this)
+        .setTitle("Allow Full Storage Access")
+        .setMessage("To access and play all your music files, the app needs permission to manage all files on your device.\n\nPlease tap 'Allow' and grant access on the next screen.")
+        .setCancelable(false)
+        .setPositiveButton("Allow", (dialog, which) -> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                try {
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                    intent.setData(Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                } catch (ActivityNotFoundException e) {
+                    // Fallback to App Info screen
+                    Intent fallbackIntent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                    fallbackIntent.setData(Uri.parse("package:" + getPackageName()));
+                    startActivity(fallbackIntent);
+
+                    Toast.makeText(this, "Please grant 'All Files Access' in App Permissions.", Toast.LENGTH_LONG).show();
+                }
+            } else {
+                Toast.makeText(this, "Not required on this Android version.", Toast.LENGTH_LONG).show();
+            }
+        })
+        .setNegativeButton("Cancel", (dialog, which) -> {
+            Toast.makeText(this, "Permission is required to access music files.", Toast.LENGTH_LONG).show();
+        })
+        .show();
+        }
+
 
     @Override
     public void onBackPressed() {
-        if (fullPlayerLayout.getVisibility() == View.VISIBLE) {
-            fullPlayerLayout.setVisibility(View.GONE);
-            miniPlayer.setVisibility(View.VISIBLE);
-            prefs.edit().putBoolean("is_full_player_visible", false).apply();
-        } else if (getSupportFragmentManager().findFragmentById(R.id.fragment_container) instanceof SettingsFragment) {
-            // Block back press on settings fragment to prevent accidental exit
-            return;
-        } else {
-            super.onBackPressed();
-        }
+    if (fullPlayerLayout.getVisibility() == View.VISIBLE) {
+        fullPlayerLayout.setVisibility(View.GONE);
+        miniPlayer.setVisibility(View.VISIBLE);
+        prefs.edit().putBoolean("is_full_player_visible", false).apply();
+    } else if (getSupportFragmentManager().findFragmentById(R.id.fragment_container) instanceof SettingsFragment) {
+        // Block back press on settings
+        return;
+    } else {
+        super.onBackPressed();
     }
+} 
+
 }

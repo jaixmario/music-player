@@ -2,7 +2,6 @@
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -15,8 +14,7 @@
         android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_horizontal"
-        android:visibility="gone" > <!-- Added visibility gone, as it's controlled by MainActivity -->
+        android:gravity="center_horizontal">
 
         <!-- Album Art with Dynamic Blur -->
         <FrameLayout
@@ -125,52 +123,23 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Main Content Area (ListView + Mini Player + Loading Indicators) -->
-    <RelativeLayout
+    <!-- Main Content Area (ListView + Mini Player) -->
+    <LinearLayout
         android:id="@+id/mainContentArea"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:orientation="vertical">
 
-        <!-- Loading Indicators -->
-        <ProgressBar
-            android:id="@+id/loadingProgressBar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/loadingStatusText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_below="@id/loadingProgressBar"
-            android:layout_centerHorizontal="true"
-            android:layout_marginTop="8dp"
-            android:text="Loading music..."
-            android:visibility="gone" />
-
         <ListView
             android:id="@+id/listView"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:dividerHeight="1dp" />
 
-        <!-- The mini_player include should ideally be outside the ListView's direct parent
-             if it's meant to be a fixed bottom bar within this area,
-             or inside a LinearLayout that wraps both ListView and mini_player.
-             Given your original structure, I'll place it after the ListView.
-             If mini_player is meant to be at the very bottom of mainContentArea,
-             you might need to adjust its layout_alignParentBottom. -->
-        <include layout="@layout/mini_player"
-            android:id="@+id/miniPlayer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_alignParentBottom="true"
-            android:visibility="gone" /> <!-- Added visibility gone, as it's controlled by MainActivity -->
-
-    </RelativeLayout>
+        <include layout="@layout/mini_player" />
+    </LinearLayout>
 
     <!-- Fragment Container for page-style navigation -->
     <FrameLayout
